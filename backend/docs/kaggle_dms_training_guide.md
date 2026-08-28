@@ -57,6 +57,8 @@ Trên máy Windows, chạy:
 
 Script kiểm tra remote `gdrive`, folder ID và `H:\My Drive\project3_runs`, sau đó copy cấu hình base64 vào clipboard mà không in token. Dán giá trị clipboard vào Kaggle Secret `RCLONE_CONFIG_B64`. Khi Internet được bật, notebook chỉ cài `rclone` bằng apt nếu secret này thực sự tồn tại.
 
+Notebook gọi remote thuần `gdrive:` và truyền folder đích qua biến backend chính thức `RCLONE_DRIVE_ROOT_FOLDER_ID`. Cách này tương thích với rclone cũ trong Kaggle và tránh lỗi `config name contains invalid characters` do connection-string chứa dấu phẩy.
+
 Notebook ưu tiên Drive API nếu cả hai cách đều được cấu hình. Nếu không xác minh được backend thật, notebook dừng trước cell train.
 
 ### Thiết lập ổn định cho Kaggle

@@ -225,12 +225,12 @@ DRIVE_FOLDER_ID = "1RfDV984zjw0Y5yfnxtnd7pPQhJpNczt_"
 DRIVE_OAUTH_SECRET = "GDRIVE_OAUTH_JSON"
 DRIVE_SERVICE_ACCOUNT_SECRET = "GDRIVE_SERVICE_ACCOUNT_JSON"
 RCLONE_CONFIG_B64_SECRET = "RCLONE_CONFIG_B64"
-# Override root_folder_id để rclone và Drive API luôn trỏ đúng cùng folder từ link,
-# kể cả khi tài khoản có một thư mục My Drive khác cũng tên project3_runs.
-RCLONE_REMOTE = os.getenv(
-    "DMS_RCLONE_REMOTE",
-    f"gdrive,root_folder_id={DRIVE_FOLDER_ID}:",
-).rstrip("/")
+# Dùng remote name thuần để tương thích cả rclone cũ trong Kaggle.
+# Folder ID được truyền qua biến backend chính thức RCLONE_DRIVE_ROOT_FOLDER_ID;
+# tránh connection-string mới ``gdrive,root_folder_id=...:`` mà rclone cũ
+# hiểu nhầm thành một config name chứa dấu phẩy.
+RCLONE_REMOTE = os.getenv("DMS_RCLONE_REMOTE", "gdrive:").rstrip("/")
+RCLONE_DRIVE_ROOT_FOLDER_ID = os.getenv("DMS_RCLONE_ROOT_FOLDER_ID", DRIVE_FOLDER_ID)
 DRIVE_SYNC_ENABLED = True
 DRIVE_SYNC_REQUIRED = IS_KAGGLE
 RCLONE_FALLBACK_ENABLED = True
@@ -584,6 +584,9 @@ def configure_rclone_secret():
     except OSError:
         pass
     os.environ["RCLONE_CONFIG"] = str(config_path)
+    # Backend option documented by rclone; works on older Kaggle packages and
+    # restricts gdrive: to the exact folder supplied by the user.
+    os.environ["RCLONE_DRIVE_ROOT_FOLDER_ID"] = RCLONE_DRIVE_ROOT_FOLDER_ID
     return config_path
 
 class RcloneRunStore:
@@ -1293,7 +1296,7 @@ print("MODEL_FOR_INFER:", MODEL_FOR_INFER)
     )
 
     notebook["cells"] = front + weak_stage + inference_tail
-    notebook.setdefault("metadata", {})["dms_pipeline_version"] = "4class-multisource-kaggle-drive-v6"
+    notebook.setdefault("metadata", {})["dms_pipeline_version"] = "4class-multisource-kaggle-drive-v7"
     notebook["metadata"]["accelerator"] = "GPU"
     NOTEBOOK.write_text(json.dumps(notebook, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"Updated {NOTEBOOK} with {len(notebook['cells'])} cells")
