@@ -59,6 +59,14 @@ Script kiểm tra remote `gdrive`, folder ID và `H:\My Drive\project3_runs`, sa
 
 Notebook ưu tiên Drive API nếu cả hai cách đều được cấu hình. Nếu không xác minh được backend thật, notebook dừng trước cell train.
 
+### Thiết lập ổn định cho Kaggle
+
+- Mặc định `BATCH=8`, `WORKERS=2` để giảm lỗi CUDA OOM và DataLoader worker trên GPU T4/P100.
+- Notebook yêu cầu còn ít nhất 8 GiB trong `/kaggle/working` trước khi giải nén và train.
+- Ultralytics được giữ trong dải `>=8.3,<9`; bản Kaggle quá cũ hoặc từ major version khác sẽ được thay bằng bản tương thích.
+- Base detector và pseudo fine-tune có checkpoint/resume riêng. Checkpoint đã đủ epoch sẽ chuyển thẳng sang đánh giá, tránh lỗi `nothing to resume`.
+- Khi phiên mới không còn `best.pt` local, notebook tải `best.pt` đã xác minh từ Google Drive; chỉ dùng epoch/last checkpoint làm fallback.
+
 ## Tránh lỗi `raytune` trên Kaggle
 
 - Không thêm `raytune=False` vào `model.train(...)`; đây không phải tham số train.

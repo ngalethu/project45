@@ -70,6 +70,7 @@ Notebook phát triển từ bản `minimal_stable`, giữ nguyên engine YOLO + 
             r"""
 # 1) MÔI TRƯỜNG TỐI GIẢN — không force-reinstall torch/CUDA
 import importlib.util
+import importlib.metadata
 import os
 import shutil
 import subprocess
@@ -83,7 +84,24 @@ def sh(command: str):
     print(f"\n>>> {command}")
     subprocess.check_call(command, shell=True)
 
-if importlib.util.find_spec("ultralytics") is None:
+def version_tuple(value: str):
+    numbers = []
+    for part in value.split(".")[:3]:
+        digits = "".join(ch for ch in part if ch.isdigit())
+        numbers.append(int(digits or 0))
+    return tuple((numbers + [0, 0, 0])[:3])
+
+installed_ultralytics = None
+try:
+    installed_ultralytics = importlib.metadata.version("ultralytics")
+except importlib.metadata.PackageNotFoundError:
+    pass
+
+if (
+    installed_ultralytics is None
+    or version_tuple(installed_ultralytics) < (8, 3, 0)
+    or version_tuple(installed_ultralytics) >= (9, 0, 0)
+):
     sh('python -m pip install -q "ultralytics>=8.3,<9" "PyYAML>=6"')
 if importlib.util.find_spec("googleapiclient") is None:
     sh('python -m pip install -q "google-api-python-client>=2.100" "google-auth>=2.20"')
@@ -109,7 +127,9 @@ print("opencv:", cv2.__version__)
 print("torch:", torch.__version__, "CUDA:", torch.cuda.is_available())
 print("ultralytics:", ultralytics.__version__)
 if torch.cuda.is_available():
+    gpu_props = torch.cuda.get_device_properties(0)
     print("GPU:", torch.cuda.get_device_name(0))
+    print("GPU memory (GiB):", round(gpu_props.total_memory / 1024**3, 2))
 else:
     raise RuntimeError("Hãy bật GPU: Kaggle Settings > Accelerator > GPU")
 """
@@ -156,6 +176,13 @@ else:
 
 WORK_ROOT.mkdir(parents=True, exist_ok=True)
 RUNS_ROOT.mkdir(parents=True, exist_ok=True)
+if IS_KAGGLE:
+    working_free_gib = shutil.disk_usage("/kaggle/working").free / 1024**3
+    print("Kaggle /working free (GiB):", round(working_free_gib, 2))
+    if working_free_gib < 8:
+        raise RuntimeError(
+            "Kaggle /working còn dưới 8 GiB; hãy Restart Session trước khi giải nén/train."
+        )
 print("PLATFORM =", PLATFORM)
 print("INPUT_ROOT =", INPUT_ROOT)
 print("WORK_ROOT =", WORK_ROOT)
@@ -191,6 +218,7 @@ EXP_NAME = "yolo11m_dms_4class_base"
 FINE_TUNE_NAME = "yolo11m_dms_4class_pseudo_finetune"
 MODEL_NAME = "yolo11m.pt"
 RESUME_CKPT = None
+FINE_RESUME_CKPT = None
 
 # Google Drive persistence. Folder ID lấy từ link người dùng cung cấp.
 DRIVE_FOLDER_ID = "1RfDV984zjw0Y5yfnxtnd7pPQhJpNczt_"
@@ -212,8 +240,8 @@ AUTO_RESUME_FROM_STORE = True
 IMG_SIZE = 640
 EPOCHS = 80
 PSEUDO_EPOCHS = 20
-BATCH = -1          # Ultralytics AutoBatch; đổi thành 8/16 nếu môi trường không hỗ trợ
-WORKERS = 4
+BATCH = 8           # ổn định trên Kaggle T4/P100 16 GB; dùng -1 chỉ khi muốn thử AutoBatch
+WORKERS = 2         # giảm lỗi DataLoader shared-memory/worker exit trên Kaggle
 PATIENCE = 20
 CACHE = False
 SAVE_PERIOD = 1      # bắt buộc tạo checkpoint sau từng epoch
@@ -394,6 +422,31 @@ class DriveRunStore:
             supportsAllDrives=True, includeItemsFromAllDrives=True,
         ).execute(num_retries=5)
         return response.get("files", [])
+
+    def download_named(self, remote_name, destination_dir, required=False):
+        matches = self._find(remote_name)
+        if not matches:
+            if required:
+                raise FileNotFoundError(f"Drive không có {self.run_name}/{remote_name}")
+            return None
+        if len(matches) > 1:
+            raise RuntimeError(f"Drive có nhiều file trùng tên {remote_name} trong run {self.run_name}")
+        item = matches[0]
+        destination_dir = Path(destination_dir)
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        destination = destination_dir / remote_name
+        request = self.drive.files().get_media(fileId=item["id"], supportsAllDrives=True)
+        with destination.open("wb") as handle:
+            downloader = MediaIoBaseDownload(handle, request, chunksize=8 * 1024 * 1024)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk(num_retries=5)
+        if int(item.get("size", -1)) != destination.stat().st_size:
+            raise IOError(f"File tải từ Drive sai kích thước: {destination}")
+        if item.get("md5Checksum") and item["md5Checksum"] != md5_file(destination):
+            raise IOError(f"File tải từ Drive sai MD5: {destination}")
+        print(f"[DRIVE DOWNLOAD] {self.run_name}/{remote_name}: {destination}")
+        return destination
 
     def download_latest(self, destination_dir):
         pattern = re.compile(r"epoch_(\d+)\.pt$")
@@ -612,6 +665,25 @@ class RcloneRunStore:
     def list_checkpoints(self):
         result = rclone_call("lsjson", self.remote_folder, "--files-only", "--hash", capture_output=True)
         return json.loads(result.stdout or "[]")
+
+    def download_named(self, remote_name, destination_dir, required=False):
+        try:
+            item = self._stat(remote_name)
+        except (subprocess.CalledProcessError, IOError):
+            if required:
+                raise FileNotFoundError(f"rclone không có {self.run_name}/{remote_name}")
+            return None
+        destination_dir = Path(destination_dir)
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        destination = destination_dir / remote_name
+        rclone_call("copyto", self._target(remote_name), str(destination), "--retries", "5")
+        if int(item.get("Size", -1)) != destination.stat().st_size:
+            raise IOError(f"File tải bằng rclone sai kích thước: {destination}")
+        remote_md5 = self._md5(item)
+        if remote_md5 and remote_md5.lower() != md5_file(destination).lower():
+            raise IOError(f"File tải bằng rclone sai MD5: {destination}")
+        print(f"[RCLONE DOWNLOAD] {self.run_name}/{remote_name}: {destination}")
+        return destination
 
     def download_latest(self, destination_dir):
         pattern = re.compile(r"epoch_(\d+)\.pt$")
@@ -896,6 +968,8 @@ else:
 - Local: checkpoint nằm trực tiếp tại `H:\My Drive\project3_runs` nếu ổ Drive Desktop đang mount.
 - Resume bằng `last.pt`; đánh giá/suy luận bằng `best.pt`.
 - Khi `AUTO_RESUME_FROM_STORE=True`, notebook tải checkpoint `epoch_NNN.pt` mới nhất đã xác minh MD5; với local/Colab, ưu tiên `weights/last.pt` tại thư mục đồng bộ trực tiếp.
+- Nếu checkpoint đã đủ số epoch yêu cầu, notebook không gọi `resume=True` lần nữa mà tải `best.pt` và chuyển thẳng sang đánh giá.
+- Cả base stage và pseudo fine-tune stage đều tự resume độc lập.
 - Test split chỉ dùng đánh giá cuối, không dùng chọn pseudo-label hoặc tune threshold.
 """
         ),
@@ -926,6 +1000,27 @@ ULTRALYTICS_DISABLED = update_ultralytics_settings_compat(
 DEVICE = 0 if torch.cuda.is_available() else "cpu"
 save_dir = RUNS_ROOT / EXP_NAME
 
+def checkpoint_epoch_number(checkpoint_path):
+    checkpoint_path = Path(checkpoint_path)
+    match = re.fullmatch(r"epoch_(\d+)\.pt", checkpoint_path.name)
+    if match:
+        return int(match.group(1))
+    try:
+        try:
+            payload = torch.load(str(checkpoint_path), map_location="cpu", weights_only=False)
+        except TypeError:
+            # PyTorch < 2.0 does not expose the weights_only keyword.
+            payload = torch.load(str(checkpoint_path), map_location="cpu")
+        return int(payload.get("epoch", -1)) + 1 if isinstance(payload, dict) else 0
+    except Exception as exc:
+        print(f"[RESUME WARNING] Không đọc được epoch metadata từ {checkpoint_path}: {exc}")
+        return 0
+
+def stage_is_complete(checkpoint_path, requested_epochs):
+    completed_epochs = checkpoint_epoch_number(checkpoint_path)
+    print(f"[RESUME CHECK] checkpoint_epoch={completed_epochs}, target={requested_epochs}")
+    return completed_epochs >= int(requested_epochs)
+
 if RESUME_CKPT is None and AUTO_RESUME_FROM_STORE:
     direct_last = RUNS_ROOT / EXP_NAME / "weights" / "last.pt"
     if not IS_KAGGLE and direct_last.is_file():
@@ -934,15 +1029,22 @@ if RESUME_CKPT is None and AUTO_RESUME_FROM_STORE:
     elif CHECKPOINT_STORE is not None:
         RESUME_CKPT = CHECKPOINT_STORE.for_run(EXP_NAME).download_latest(WORK_ROOT / "resume" / EXP_NAME)
 
+BASE_COMPLETED_CKPT = None
 if RESUME_CKPT:
     checkpoint = Path(RESUME_CKPT)
     assert checkpoint.exists(), checkpoint
     model = YOLO(str(checkpoint))
-    attach_checkpoint_callbacks(model, EXP_NAME)
-    results = model.train(
-        data=str(yaml_path), resume=True, device=DEVICE, workers=WORKERS,
-        cache=CACHE, save=True, save_period=SAVE_PERIOD, plots=True,
-    )
+    if stage_is_complete(checkpoint, EPOCHS):
+        BASE_COMPLETED_CKPT = checkpoint
+        results = None
+        print(f"[BASE COMPLETE] Bỏ qua train lại {EPOCHS} epoch; chuyển sang đánh giá.")
+    else:
+        attach_checkpoint_callbacks(model, EXP_NAME)
+        results = model.train(
+            data=str(yaml_path), resume=True, epochs=EPOCHS,
+            device=DEVICE, workers=WORKERS, cache=CACHE,
+            save=True, save_period=SAVE_PERIOD, plots=True,
+        )
 else:
     model = YOLO(MODEL_SIZE)
     attach_checkpoint_callbacks(model, EXP_NAME)
@@ -969,8 +1071,16 @@ print("Resume:", save_dir / "weights" / "last.pt")
 weights_dir = RUNS_ROOT / EXP_NAME / "weights"
 best_pt = weights_dir / "best.pt"
 last_pt = weights_dir / "last.pt"
-assert best_pt.exists() or last_pt.exists(), f"Không thấy checkpoint trong {weights_dir}"
-MODEL_FOR_INFER = str(best_pt if best_pt.exists() else last_pt)
+remote_best = None
+if not best_pt.exists() and CHECKPOINT_STORE is not None:
+    remote_best = CHECKPOINT_STORE.for_run(EXP_NAME).download_named(
+        "best.pt", WORK_ROOT / "resume" / EXP_NAME, required=False,
+    )
+fallback_checkpoint = BASE_COMPLETED_CKPT or (Path(RESUME_CKPT) if RESUME_CKPT else None)
+checkpoint_candidates = [best_pt, remote_best, last_pt, fallback_checkpoint]
+selected_checkpoint = next((Path(path) for path in checkpoint_candidates if path and Path(path).is_file()), None)
+assert selected_checkpoint is not None, f"Không thấy checkpoint base hợp lệ trong {weights_dir} hoặc checkpoint store"
+MODEL_FOR_INFER = str(selected_checkpoint)
 print("best.pt:", best_pt.exists(), best_pt)
 print("last.pt:", last_pt.exists(), last_pt)
 print("MODEL_FOR_INFER:", MODEL_FOR_INFER)
@@ -1073,18 +1183,48 @@ else:
 # 13) FINE-TUNE VỚI PSEUDO-LABEL, GIỮ VAL/TEST GOLD GỐC
 FINE_SUMMARY = None
 if PSEUDO_READY:
-    fine_model = YOLO(MODEL_FOR_INFER)
-    attach_checkpoint_callbacks(fine_model, FINE_TUNE_NAME)
-    fine_model.train(
-        data=str(combined_yaml), imgsz=IMG_SIZE, epochs=PSEUDO_EPOCHS, batch=BATCH,
-        device=DEVICE, workers=WORKERS, patience=10, cache=False,
-        project=str(RUNS_ROOT), name=FINE_TUNE_NAME, exist_ok=True,
-        save=True, save_period=SAVE_PERIOD, amp=True, plots=True,
-        optimizer="AdamW", lr0=0.002, lrf=0.05, cos_lr=True, close_mosaic=5,
-        mosaic=0.4, mixup=0.0, fliplr=0.5,
-        seed=SEED, deterministic=True,
-    )
-    fine_best = RUNS_ROOT / FINE_TUNE_NAME / "weights" / "best.pt"
+    if FINE_RESUME_CKPT is None and AUTO_RESUME_FROM_STORE:
+        direct_fine_last = RUNS_ROOT / FINE_TUNE_NAME / "weights" / "last.pt"
+        if not IS_KAGGLE and direct_fine_last.is_file():
+            FINE_RESUME_CKPT = direct_fine_last
+        elif CHECKPOINT_STORE is not None:
+            FINE_RESUME_CKPT = CHECKPOINT_STORE.for_run(FINE_TUNE_NAME).download_latest(
+                WORK_ROOT / "resume" / FINE_TUNE_NAME,
+            )
+
+    fine_complete = bool(FINE_RESUME_CKPT) and stage_is_complete(FINE_RESUME_CKPT, PSEUDO_EPOCHS)
+    if fine_complete:
+        print(f"[FINE COMPLETE] Bỏ qua train lại {PSEUDO_EPOCHS} epoch; chuyển sang đánh giá.")
+    elif FINE_RESUME_CKPT:
+        fine_model = YOLO(str(FINE_RESUME_CKPT))
+        attach_checkpoint_callbacks(fine_model, FINE_TUNE_NAME)
+        fine_model.train(
+            data=str(combined_yaml), resume=True, epochs=PSEUDO_EPOCHS,
+            device=DEVICE, workers=WORKERS, cache=False,
+            save=True, save_period=SAVE_PERIOD, plots=True,
+        )
+    else:
+        fine_model = YOLO(MODEL_FOR_INFER)
+        attach_checkpoint_callbacks(fine_model, FINE_TUNE_NAME)
+        fine_model.train(
+            data=str(combined_yaml), imgsz=IMG_SIZE, epochs=PSEUDO_EPOCHS, batch=BATCH,
+            device=DEVICE, workers=WORKERS, patience=10, cache=False,
+            project=str(RUNS_ROOT), name=FINE_TUNE_NAME, exist_ok=True,
+            save=True, save_period=SAVE_PERIOD, amp=True, plots=True,
+            optimizer="AdamW", lr0=0.002, lrf=0.05, cos_lr=True, close_mosaic=5,
+            mosaic=0.4, mixup=0.0, fliplr=0.5,
+            seed=SEED, deterministic=True,
+        )
+
+    fine_local_best = RUNS_ROOT / FINE_TUNE_NAME / "weights" / "best.pt"
+    fine_remote_best = None
+    if not fine_local_best.exists() and CHECKPOINT_STORE is not None:
+        fine_remote_best = CHECKPOINT_STORE.for_run(FINE_TUNE_NAME).download_named(
+            "best.pt", WORK_ROOT / "resume" / FINE_TUNE_NAME, required=False,
+        )
+    fine_candidates = [fine_local_best, fine_remote_best, FINE_RESUME_CKPT]
+    fine_best = next((Path(path) for path in fine_candidates if path and Path(path).is_file()), None)
+    assert fine_best is not None, "Không tìm thấy fine-tune checkpoint để đánh giá"
     FINE_SUMMARY = evaluate_checkpoint(fine_best, f"{FINE_TUNE_NAME}_test")
 else:
     print("Không có pseudo-label đạt ngưỡng; giữ base checkpoint.")
@@ -1137,6 +1277,7 @@ print("MODEL_FOR_INFER:", MODEL_FOR_INFER)
 - Không resume từ `best.pt` nếu cần giữ optimizer/epoch state.
 - `checkpoint_sync_ready.json` phải xuất hiện trong folder Drive trước khi cell train chạy.
 - Mỗi epoch tạo `epoch_NNN.pt`; `best.pt`, `last.pt`, `results.csv`, `args.yaml` và `checkpoint_latest.json` được đồng bộ có xác minh.
+- Base/fine-tune đã hoàn thành sẽ được nhận diện để tránh lỗi Ultralytics `nothing to resume`.
 - **Không** đổi `RUNS_ROOT` thành đường dẫn có chữ `drive` trên Kaggle: đó vẫn chỉ là thư mục output cục bộ và sẽ mất khi session hết hạn.
 """
     )
@@ -1152,7 +1293,7 @@ print("MODEL_FOR_INFER:", MODEL_FOR_INFER)
     )
 
     notebook["cells"] = front + weak_stage + inference_tail
-    notebook.setdefault("metadata", {})["dms_pipeline_version"] = "4class-multisource-kaggle-drive-v4"
+    notebook.setdefault("metadata", {})["dms_pipeline_version"] = "4class-multisource-kaggle-drive-v6"
     notebook["metadata"]["accelerator"] = "GPU"
     NOTEBOOK.write_text(json.dumps(notebook, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"Updated {NOTEBOOK} with {len(notebook['cells'])} cells")
