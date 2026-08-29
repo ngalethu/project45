@@ -36,6 +36,8 @@ Không cam kết trước mAP/F1 >85%. Chỉ kết luận đạt khi file `metri
 
 `/kaggle/working` chỉ là scratch disk. Notebook lưu `epoch_NNN.pt` sau từng epoch vào Google Drive, xác minh size/MD5 và tự tải epoch mới nhất để resume ở phiên sau. Không đặt một thư mục tên `drive` trong Kaggle output rồi coi đó là Google Drive.
 
+Kaggle Upload Data có thể tự giải nén các file ZIP. Notebook v8 nhận cả hai dạng: file `dms_yolo_4class_v2.zip` hoặc thư mục đã giải nén chứa `dms_dataset.yaml`; `training_code` và `seatbelt_real_unlabelled` cũng được phát hiện tương tự.
+
 ## Checkpoint Google Drive
 
 Folder đích: <https://drive.google.com/drive/folders/1RfDV984zjw0Y5yfnxtnd7pPQhJpNczt_>.

@@ -838,29 +838,56 @@ def find_input_file(filename: str, required: bool = True):
         raise FileNotFoundError(f"Không thấy {filename} trong {INPUT_ROOT}. Hãy attach Kaggle dataset bundle.")
     return None
 
+def find_input_dir(dirname: str, required: bool = False):
+    candidates = sorted(
+        path for path in INPUT_ROOT.rglob(dirname)
+        if path.is_dir()
+    ) if INPUT_ROOT.exists() else []
+    if candidates:
+        print(f"{dirname}/: {candidates[0]}")
+        return candidates[0]
+    if required:
+        raise FileNotFoundError(f"Không thấy thư mục {dirname} trong {INPUT_ROOT}.")
+    return None
+
 local_v2 = Path(r"D:/.idea/project4/data/processed/dms_yolo_4class_v2")
 if PLATFORM == "local" and (local_v2 / "dms_dataset.yaml").exists():
     dataset_dir_used = local_v2
 else:
-    dataset_zip = find_input_file(DATASET_ARCHIVE_NAME)
-    extract_root = WORK_ROOT / "dataset"
-    yaml_candidates = list(extract_root.rglob("dms_dataset.yaml")) if extract_root.exists() else []
-    if not yaml_candidates:
-        extract_root.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(dataset_zip) as archive:
-            archive.extractall(extract_root)
-        yaml_candidates = list(extract_root.rglob("dms_dataset.yaml"))
-    if len(yaml_candidates) != 1:
-        raise RuntimeError(f"Cần đúng 1 dms_dataset.yaml, tìm thấy: {yaml_candidates}")
-    dataset_dir_used = yaml_candidates[0].parent
+    # Kaggle Upload Data thường tự giải nén ZIP thành một hoặc nhiều thư mục lồng nhau.
+    # Ưu tiên YAML đã attach; chỉ giải nén thủ công khi Input thực sự còn file ZIP.
+    attached_yamls = sorted(INPUT_ROOT.rglob("dms_dataset.yaml")) if INPUT_ROOT.exists() else []
+    if len(attached_yamls) == 1:
+        dataset_dir_used = attached_yamls[0].parent
+        print("Kaggle extracted dataset:", dataset_dir_used)
+    elif len(attached_yamls) > 1:
+        raise RuntimeError(f"Có nhiều dms_dataset.yaml trong Kaggle Input: {attached_yamls}")
+    else:
+        dataset_zip = find_input_file(DATASET_ARCHIVE_NAME)
+        extract_root = WORK_ROOT / "dataset"
+        yaml_candidates = list(extract_root.rglob("dms_dataset.yaml")) if extract_root.exists() else []
+        if not yaml_candidates:
+            extract_root.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(dataset_zip) as archive:
+                archive.extractall(extract_root)
+            yaml_candidates = list(extract_root.rglob("dms_dataset.yaml"))
+        if len(yaml_candidates) != 1:
+            raise RuntimeError(f"Cần đúng 1 dms_dataset.yaml, tìm thấy: {yaml_candidates}")
+        dataset_dir_used = yaml_candidates[0].parent
 
-training_code_dir = WORK_ROOT / "training_code"
-code_zip = find_input_file(TRAINING_CODE_ARCHIVE_NAME, required=False)
-if code_zip and not list(training_code_dir.rglob("train_yolo11_dms.py")):
-    training_code_dir.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(code_zip) as archive:
-        archive.extractall(training_code_dir)
-elif PLATFORM == "local" and (PROJECT_ROOT / "backend" / "scripts" / "train_yolo11_dms.py").exists():
+# Kaggle cũng có thể tự giải nén training_code.zip; ưu tiên script đã attach.
+attached_training_scripts = sorted(INPUT_ROOT.rglob("train_yolo11_dms.py")) if INPUT_ROOT.exists() else []
+if attached_training_scripts:
+    training_code_dir = attached_training_scripts[0].parent
+    print("Kaggle extracted training code:", training_code_dir)
+else:
+    training_code_dir = WORK_ROOT / "training_code"
+    code_zip = find_input_file(TRAINING_CODE_ARCHIVE_NAME, required=False)
+    if code_zip and not list(training_code_dir.rglob("train_yolo11_dms.py")):
+        training_code_dir.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(code_zip) as archive:
+            archive.extractall(training_code_dir)
+if PLATFORM == "local" and (PROJECT_ROOT / "backend" / "scripts" / "train_yolo11_dms.py").exists():
     training_code_dir = PROJECT_ROOT / "backend" / "scripts"
 sys.path.insert(0, str(training_code_dir))
 
@@ -1151,6 +1178,21 @@ combined_yaml = None
 helper_candidates = list(training_code_dir.rglob("pseudo_label_weak_dms_sources.py"))
 auc_zip = find_input_file(AUC_ARCHIVE_NAME, required=False)
 seatbelt_zip = find_input_file(SEATBELT_ARCHIVE_NAME, required=False)
+# Kaggle Upload Data có thể giải nén seatbelt ZIP thành thư mục. Helper pseudo-label
+# cần ZipFile, nên đóng gói lại tám ảnh vào scratch disk nếu cần.
+if seatbelt_zip is None:
+    seatbelt_dir = find_input_dir("seatbelt_real_unlabelled", required=False)
+    if seatbelt_dir is not None:
+        seatbelt_images = sorted(
+            path for path in seatbelt_dir.rglob("*")
+            if path.is_file() and path.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+        )
+        if seatbelt_images:
+            seatbelt_zip = WORK_ROOT / "seatbelt_real_unlabelled_runtime.zip"
+            with zipfile.ZipFile(seatbelt_zip, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                for image_path in seatbelt_images:
+                    archive.write(image_path, image_path.relative_to(seatbelt_dir).as_posix())
+            print(f"Repacked Kaggle seatbelt directory: {len(seatbelt_images)} images -> {seatbelt_zip}")
 AUC_PASSWORD = os.getenv("AUC_ZIP_PASSWORD")
 if IS_KAGGLE and not AUC_PASSWORD:
     try:
@@ -1296,7 +1338,7 @@ print("MODEL_FOR_INFER:", MODEL_FOR_INFER)
     )
 
     notebook["cells"] = front + weak_stage + inference_tail
-    notebook.setdefault("metadata", {})["dms_pipeline_version"] = "4class-multisource-kaggle-drive-v7"
+    notebook.setdefault("metadata", {})["dms_pipeline_version"] = "4class-multisource-kaggle-drive-v8"
     notebook["metadata"]["accelerator"] = "GPU"
     NOTEBOOK.write_text(json.dumps(notebook, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"Updated {NOTEBOOK} with {len(notebook['cells'])} cells")
