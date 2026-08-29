@@ -38,6 +38,8 @@ Không cam kết trước mAP/F1 >85%. Chỉ kết luận đạt khi file `metri
 
 Kaggle Upload Data có thể tự giải nén các file ZIP. Notebook v8 nhận cả hai dạng: file `dms_yolo_4class_v2.zip` hoặc thư mục đã giải nén chứa `dms_dataset.yaml`; `training_code` và `seatbelt_real_unlabelled` cũng được phát hiện tương tự.
 
+Notebook v9 có profile thời gian dùng chung cho Kaggle/RTX 5090: base tối đa 4,5 giờ, fine-tune tối đa 0,5 giờ và dành phần còn lại của ngân sách 5,5 giờ cho test/export/upload. Ultralytics `time` override `epochs`, nhưng vẫn dừng sớm nếu hoàn thành đủ epoch trước giới hạn.
+
 ## Checkpoint Google Drive
 
 Folder đích: <https://drive.google.com/drive/folders/1RfDV984zjw0Y5yfnxtnd7pPQhJpNczt_>.

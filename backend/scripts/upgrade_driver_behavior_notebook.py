@@ -128,8 +128,26 @@ print("torch:", torch.__version__, "CUDA:", torch.cuda.is_available())
 print("ultralytics:", ultralytics.__version__)
 if torch.cuda.is_available():
     gpu_props = torch.cuda.get_device_properties(0)
-    print("GPU:", torch.cuda.get_device_name(0))
+    GPU_NAME = torch.cuda.get_device_name(0)
+    GPU_CAPABILITY = torch.cuda.get_device_capability(0)
+    TORCH_CUDA_ARCHES = torch.cuda.get_arch_list()
+    print("GPU:", GPU_NAME)
+    print("GPU capability:", GPU_CAPABILITY)
+    print("PyTorch CUDA arches:", TORCH_CUDA_ARCHES)
     print("GPU memory (GiB):", round(gpu_props.total_memory / 1024**3, 2))
+    if GPU_CAPABILITY >= (12, 0) and "sm_120" not in TORCH_CUDA_ARCHES:
+        raise RuntimeError(
+            "RTX 50xx/Blackwell cần PyTorch CUDA 12.8+. PyTorch hiện tại thiếu sm_120. "
+            "Trên Windows RTX 5090 hãy chạy trong terminal: "
+            "python -m pip install --upgrade torch torchvision "
+            "--index-url https://download.pytorch.org/whl/cu130 ; "
+            "sau đó Restart Kernel và chạy lại từ đầu."
+        )
+    # is_available() có thể vẫn True với wheel sai kiến trúc; phép tính thật mới xác minh kernel.
+    cuda_probe = torch.randn((256, 256), device="cuda")
+    cuda_probe_result = float((cuda_probe @ cuda_probe).mean().item())
+    del cuda_probe
+    print("CUDA matmul probe: OK", round(cuda_probe_result, 6))
 else:
     raise RuntimeError("Hãy bật GPU: Kaggle Settings > Accelerator > GPU")
 """
@@ -141,6 +159,7 @@ from pathlib import Path
 
 IS_KAGGLE = Path("/kaggle/input").exists()
 IS_COLAB = False
+IS_RTX_5090 = "RTX 5090" in GPU_NAME.upper()
 if not IS_KAGGLE:
     try:
         from google.colab import drive
@@ -161,13 +180,21 @@ elif IS_COLAB:
     RUNS_ROOT = Path("/content/drive/MyDrive/driver_behavior_runs")
 else:
     PLATFORM = "local"
-    PROJECT_ROOT = Path.cwd().resolve().parent if Path.cwd().name == "backend" else Path.cwd().resolve()
+    configured_project_root = os.getenv("DMS_PROJECT_ROOT")
+    if configured_project_root:
+        PROJECT_ROOT = Path(configured_project_root).expanduser().resolve()
+    else:
+        PROJECT_ROOT = Path.cwd().resolve().parent if Path.cwd().name == "backend" else Path.cwd().resolve()
     INPUT_ROOT = PROJECT_ROOT
     WORK_ROOT = PROJECT_ROOT / "backend" / "outputs" / "notebook_work"
     # Google Drive for desktop trên máy này mount My Drive tại H:. Có thể đổi bằng
     # biến môi trường DMS_LOCAL_DRIVE_RUNS mà không phải sửa notebook.
+    configured_runs_root = os.getenv("DMS_RUNS_ROOT")
     LOCAL_DRIVE_RUNS = Path(os.getenv("DMS_LOCAL_DRIVE_RUNS", r"H:\My Drive\project3_runs"))
-    if LOCAL_DRIVE_RUNS.parent.exists():
+    if configured_runs_root:
+        RUNS_ROOT = Path(configured_runs_root).expanduser().resolve()
+        LOCAL_PERSISTENCE = "configured-persistent-root"
+    elif LOCAL_DRIVE_RUNS.parent.exists():
         RUNS_ROOT = LOCAL_DRIVE_RUNS
         LOCAL_PERSISTENCE = "google-drive-desktop"
     else:
@@ -187,6 +214,7 @@ print("PLATFORM =", PLATFORM)
 print("INPUT_ROOT =", INPUT_ROOT)
 print("WORK_ROOT =", WORK_ROOT)
 print("RUNS_ROOT =", RUNS_ROOT)
+print("RTX_5090_PROFILE =", IS_RTX_5090)
 if PLATFORM == "local":
     print("LOCAL_PERSISTENCE =", LOCAL_PERSISTENCE)
 """
@@ -232,16 +260,24 @@ RCLONE_CONFIG_B64_SECRET = "RCLONE_CONFIG_B64"
 RCLONE_REMOTE = os.getenv("DMS_RCLONE_REMOTE", "gdrive:").rstrip("/")
 RCLONE_DRIVE_ROOT_FOLDER_ID = os.getenv("DMS_RCLONE_ROOT_FOLDER_ID", DRIVE_FOLDER_ID)
 DRIVE_SYNC_ENABLED = True
-DRIVE_SYNC_REQUIRED = IS_KAGGLE
+DRIVE_SYNC_REQUIRED = IS_KAGGLE or (
+    IS_RTX_5090 and os.getenv("DMS_REQUIRE_REMOTE_CHECKPOINT", "1") != "0"
+)
 RCLONE_FALLBACK_ENABLED = True
 AUTO_RESUME_FROM_STORE = True
 
-# Cấu hình mặc định nhằm nằm trong phiên Kaggle GPU 12 giờ.
+# Giới hạn toàn pipeline trong gói máy 5–6 giờ. Ultralytics `time` tính theo giờ
+# và override `epochs`; nếu đủ epoch sớm thì dừng sớm theo epoch bình thường.
 IMG_SIZE = 640
 EPOCHS = 80
 PSEUDO_EPOCHS = 20
-BATCH = 8           # ổn định trên Kaggle T4/P100 16 GB; dùng -1 chỉ khi muốn thử AutoBatch
-WORKERS = 2         # giảm lỗi DataLoader shared-memory/worker exit trên Kaggle
+TOTAL_BUDGET_HOURS = float(os.getenv("DMS_TOTAL_BUDGET_HOURS", "5.5"))
+BASE_TRAIN_HOURS = float(os.getenv("DMS_BASE_TRAIN_HOURS", "4.5"))
+FINE_TRAIN_HOURS = float(os.getenv("DMS_FINE_TRAIN_HOURS", "0.5"))
+if BASE_TRAIN_HOURS + FINE_TRAIN_HOURS > TOTAL_BUDGET_HOURS - 0.25:
+    raise ValueError("Phải dành ít nhất 0.25 giờ cho test/export/upload artifacts")
+BATCH = 32 if IS_RTX_5090 else 8
+WORKERS = 4 if IS_RTX_5090 else 2
 PATIENCE = 20
 CACHE = False
 SAVE_PERIOD = 1      # bắt buộc tạo checkpoint sau từng epoch
@@ -261,6 +297,8 @@ USE_BRIGHTEN_FOR_POSE = True
 
 print("Base:", MODEL_NAME, IMG_SIZE, EPOCHS)
 print("Pseudo:", PSEUDO_LABEL_ENABLED, PSEUDO_CONF, PSEUDO_EPOCHS)
+print("Runtime profile:", GPU_NAME, "batch=", BATCH, "workers=", WORKERS)
+print("Time budget (hours): total=", TOTAL_BUDGET_HOURS, "base=", BASE_TRAIN_HOURS, "fine=", FINE_TRAIN_HOURS)
 """
         ),
         markdown(
@@ -568,6 +606,8 @@ def rclone_mkdir(remote: str):
     )
 
 def configure_rclone_secret():
+    # Áp dụng folder ID cả khi dùng rclone.conf có sẵn trên máy RTX 5090.
+    os.environ["RCLONE_DRIVE_ROOT_FOLDER_ID"] = RCLONE_DRIVE_ROOT_FOLDER_ID
     encoded = notebook_secret(RCLONE_CONFIG_B64_SECRET)
     if not encoded:
         return None
@@ -586,7 +626,6 @@ def configure_rclone_secret():
     os.environ["RCLONE_CONFIG"] = str(config_path)
     # Backend option documented by rclone; works on older Kaggle packages and
     # restricts gdrive: to the exact folder supplied by the user.
-    os.environ["RCLONE_DRIVE_ROOT_FOLDER_ID"] = RCLONE_DRIVE_ROOT_FOLDER_ID
     return config_path
 
 class RcloneRunStore:
@@ -799,7 +838,7 @@ if DRIVE_SYNC_ENABLED:
         CHECKPOINT_STORE = DriveCheckpointStore(
             DRIVE_FOLDER_ID, oauth_json=oauth_json, service_account_json=service_json,
         )
-    elif IS_KAGGLE and RCLONE_FALLBACK_ENABLED:
+    elif RCLONE_FALLBACK_ENABLED:
         configure_rclone_secret()
         if shutil.which("rclone") is not None:
             CHECKPOINT_STORE = RcloneCheckpointStore(RCLONE_REMOTE)
@@ -815,8 +854,8 @@ if DRIVE_SYNC_ENABLED:
         print("[CHECKPOINT READY] Đã kiểm tra ghi và đọc metadata thành công.")
     elif DRIVE_SYNC_REQUIRED:
         raise RuntimeError(
-            f"Kaggle chưa có persistence thật. Thêm Secret {DRIVE_OAUTH_SECRET}, hoặc "
-            f"cài rclone và thêm Secret {RCLONE_CONFIG_B64_SECRET}. Không bắt đầu train."
+            f"{PLATFORM} chưa có persistence thật. Cấu hình {DRIVE_OAUTH_SECRET}, hoặc "
+            f"cài rclone và cung cấp {RCLONE_CONFIG_B64_SECRET}/remote gdrive. Không bắt đầu train."
         )
     else:
         print(f"[DIRECT PERSISTENCE] Checkpoint được ghi trực tiếp tại {RUNS_ROOT}")
@@ -1071,7 +1110,7 @@ if RESUME_CKPT:
     else:
         attach_checkpoint_callbacks(model, EXP_NAME)
         results = model.train(
-            data=str(yaml_path), resume=True, epochs=EPOCHS,
+            data=str(yaml_path), resume=True, epochs=EPOCHS, time=BASE_TRAIN_HOURS,
             device=DEVICE, workers=WORKERS, cache=CACHE,
             save=True, save_period=SAVE_PERIOD, plots=True,
         )
@@ -1079,7 +1118,7 @@ else:
     model = YOLO(MODEL_SIZE)
     attach_checkpoint_callbacks(model, EXP_NAME)
     results = model.train(
-        data=str(yaml_path), imgsz=IMG_SIZE, epochs=EPOCHS, batch=BATCH,
+        data=str(yaml_path), imgsz=IMG_SIZE, epochs=EPOCHS, time=BASE_TRAIN_HOURS, batch=BATCH,
         device=DEVICE, workers=WORKERS, patience=PATIENCE, cache=CACHE,
         project=str(RUNS_ROOT), name=EXP_NAME, exist_ok=True,
         save=True, save_period=SAVE_PERIOD, amp=True, plots=True,
@@ -1244,7 +1283,7 @@ if PSEUDO_READY:
         fine_model = YOLO(str(FINE_RESUME_CKPT))
         attach_checkpoint_callbacks(fine_model, FINE_TUNE_NAME)
         fine_model.train(
-            data=str(combined_yaml), resume=True, epochs=PSEUDO_EPOCHS,
+            data=str(combined_yaml), resume=True, epochs=PSEUDO_EPOCHS, time=FINE_TRAIN_HOURS,
             device=DEVICE, workers=WORKERS, cache=False,
             save=True, save_period=SAVE_PERIOD, plots=True,
         )
@@ -1252,7 +1291,8 @@ if PSEUDO_READY:
         fine_model = YOLO(MODEL_FOR_INFER)
         attach_checkpoint_callbacks(fine_model, FINE_TUNE_NAME)
         fine_model.train(
-            data=str(combined_yaml), imgsz=IMG_SIZE, epochs=PSEUDO_EPOCHS, batch=BATCH,
+            data=str(combined_yaml), imgsz=IMG_SIZE, epochs=PSEUDO_EPOCHS,
+            time=FINE_TRAIN_HOURS, batch=BATCH,
             device=DEVICE, workers=WORKERS, patience=10, cache=False,
             project=str(RUNS_ROOT), name=FINE_TUNE_NAME, exist_ok=True,
             save=True, save_period=SAVE_PERIOD, amp=True, plots=True,
@@ -1338,7 +1378,7 @@ print("MODEL_FOR_INFER:", MODEL_FOR_INFER)
     )
 
     notebook["cells"] = front + weak_stage + inference_tail
-    notebook.setdefault("metadata", {})["dms_pipeline_version"] = "4class-multisource-kaggle-drive-v8"
+    notebook.setdefault("metadata", {})["dms_pipeline_version"] = "4class-multisource-rtx5090-5h-v9"
     notebook["metadata"]["accelerator"] = "GPU"
     NOTEBOOK.write_text(json.dumps(notebook, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"Updated {NOTEBOOK} with {len(notebook['cells'])} cells")
