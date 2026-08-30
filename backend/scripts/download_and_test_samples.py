@@ -14,11 +14,6 @@ SAMPLE_URLS = [
         "expected": "using_phone"
     },
     {
-        "name": "test_driver_smoking.jpg",
-        "url": "https://images.unsplash.com/photo-1527061011665-3652c757a4d4?w=800&q=80",
-        "expected": "smoking"
-    },
-    {
         "name": "test_driver_seatbelt.jpg",
         "url": "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=800&q=80",
         "expected": "seatbelt/no_seatbelt"
@@ -51,9 +46,6 @@ def download_samples():
             if "phone" in item["name"]:
                 cv2.rectangle(img, (380, 150), (430, 240), (0, 0, 255), -1)
                 cv2.putText(img, "USING PHONE DEMO", (50, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-            elif "smoking" in item["name"]:
-                cv2.rectangle(img, (310, 210), (360, 225), (200, 200, 255), -1)
-                cv2.putText(img, "SMOKING DEMO", (50, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
             else:
                 cv2.line(img, (250, 260), (390, 430), (0, 255, 255), 4)
                 cv2.putText(img, "NO SEATBELT DEMO", (50, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)

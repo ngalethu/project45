@@ -1,0 +1,39 @@
+{
+  "precision_macro": 0.9113569839052175,
+  "recall_macro": 0.8830377685232972,
+  "f1_macro": 0.8969739086749207,
+  "map50": 0.9295038353908808,
+  "map50_95": 0.6334839080323638,
+  "target": {
+    "map50": 0.85,
+    "f1_macro": 0.85
+  },
+  "per_class": {
+    "phone": {
+      "precision": 0.9446206706359531,
+      "recall": 0.8914955242338132,
+      "f1": 0.9172895509811962,
+      "map50": 0.9500315990203712,
+      "map50_95": 0.7517941113023278
+    },
+    "seatbelt": {
+      "precision": 0.8671246274790325,
+      "recall": 0.8511137162954279,
+      "f1": 0.8590445753454122,
+      "map50": 0.8929039246831313,
+      "map50_95": 0.5579693138534441
+    },
+    "no-seatbelt": {
+      "precision": 0.9223256536006669,
+      "recall": 0.9065040650406504,
+      "f1": 0.9143464213840888,
+      "map50": 0.9455759824691399,
+      "map50_95": 0.5906882989413195
+    }
+  },
+  "evaluation_split": "test",
+  "recovered_from_cancelled_training_run": true,
+  "target_met": true,
+  "best_pt_sha256": "06c8d92e82b556943af507fb6619383d0b973cd5cd86702a35f731d9b50399f7",
+  "source_best_pt": "/kaggle/input/dms-yolo11m-three-class-checkpoint-20260830/best.pt"
+}

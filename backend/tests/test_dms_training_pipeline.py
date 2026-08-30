@@ -20,6 +20,7 @@ from scripts.prepare_dms_dataset import (  # noqa: E402
     source_for_filename,
 )
 from scripts.pseudo_label_weak_dms_sources import auc_phone_entries  # noqa: E402
+from scripts.build_dms_3class_curated import select_group_diverse_negatives  # noqa: E402
 from scripts.train_yolo11_dms import configure_ultralytics_settings, validate_dataset_yaml  # noqa: E402
 
 
@@ -69,6 +70,21 @@ class WeakSourceTests(unittest.TestCase):
         self.assertEqual(selected, ["v2_cam1_cam2_ split_by_driver/Camera 1/train/c1/a.jpg"])
 
 
+class CuratedDatasetTests(unittest.TestCase):
+    def test_negative_selection_is_deterministic_and_group_diverse(self):
+        paths = [
+            Path("roboflow_v9_primary__driver-a.rf.aaaaaaaa.txt"),
+            Path("roboflow_v9_primary__driver-a.rf.bbbbbbbb.txt"),
+            Path("roboflow_v9_primary__driver-b.rf.cccccccc.txt"),
+        ]
+        first = select_group_diverse_negatives(paths, limit=2, seed=42)
+        second = select_group_diverse_negatives(list(reversed(paths)), limit=2, seed=42)
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 2)
+        self.assertTrue(any("driver-a" in path.name for path in first))
+        self.assertTrue(any("driver-b" in path.name for path in first))
+
+
 class TrainingConfigTests(unittest.TestCase):
     def test_ultralytics_settings_skip_missing_raytune_key(self):
         class FakeSettings(dict):
@@ -79,7 +95,7 @@ class TrainingConfigTests(unittest.TestCase):
         self.assertEqual(applied, {"wandb": False, "sync": False})
         self.assertEqual(settings, {"wandb": False, "sync": False})
 
-    def test_dataset_yaml_requires_four_canonical_classes(self):
+    def test_dataset_yaml_requires_three_canonical_classes(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "data.yaml"
             path.write_text(
@@ -89,15 +105,15 @@ class TrainingConfigTests(unittest.TestCase):
                         "train": "images/train",
                         "val": "images/val",
                         "test": "images/test",
-                        "nc": 4,
-                        "names": {0: "phone", 1: "seatbelt", 2: "no-seatbelt", 3: "smoking"},
+                        "nc": 3,
+                        "names": {0: "phone", 1: "seatbelt", 2: "no-seatbelt"},
                     },
                     sort_keys=False,
                 ),
                 encoding="utf-8",
             )
             data = validate_dataset_yaml(path)
-        self.assertEqual(data["nc"], 4)
+        self.assertEqual(data["nc"], 3)
 
     def test_notebook_checkpoint_cells_compile_and_use_persistent_targets(self):
         notebook_path = BACKEND_DIR / "driver_behavior_yolo11m_mediapipe_minimal_stable.ipynb"

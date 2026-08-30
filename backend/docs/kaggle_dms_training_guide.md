@@ -1,105 +1,67 @@
-# Hướng dẫn train DMS YOLO11 trên Kaggle Web
+# Hướng dẫn train DMS 3 lớp trên Kaggle T4
 
-## Trạng thái dữ liệu thực tế
+## Trạng thái dữ liệu
 
-- Detection hợp lệ: 38.969 ảnh, 38.969 label.
-- Split group-disjoint: 31.324 train, 3.833 validation, 3.812 test.
-- Canonical classes: `phone`, `seatbelt`, `no-seatbelt`, `smoking`.
-- AUC v2 local: 32.714 entry classification nhưng ZIP đang encrypted; chỉ dùng 5.418 phone-candidate khi có mật khẩu/quyền truy cập hợp lệ.
-- Seatbelt Real tải được: 8 ảnh chưa có bounding box, được xét pseudo-label.
-- Một ảnh raw 0 byte và label đi kèm đã bị xóa theo yêu cầu.
-- Audit phát hiện 3.004 nhóm từng nằm chéo các split nguồn; dataset v2 đã chia lại theo group.
+- Dataset: `data/processed/dms_yolo_3class_v4_12k`
+- Train: 12.000 ảnh từ 12.000 capture group duy nhất
+- Validation: 2.801 ảnh
+- Test: 2.681 ảnh
+- Lớp: `phone`, `seatbelt`, `no-seatbelt`
+- Negative train: 800 ảnh
+- Group giao nhau giữa train/val/test: 0
+- Windshield/roadside: giữ toàn bộ 649 group train và 69 ảnh test ngoại miền
 
-Không cam kết trước mAP/F1 >85%. Chỉ kết luận đạt khi file `metrics_summary.json` của test set có `target_met: true`.
+Không được kết luận mAP/F1 trên 85% trước khi Kaggle tạo `metrics_summary.json` có `target_met: true`.
 
-## File sử dụng
+## File Kaggle
 
-- Notebook: `backend/driver_behavior_yolo11m_mediapipe_minimal_stable.ipynb`
-- Script kiểm tra Drive local/rclone: `backend/scripts/setup_checkpoint_drive.ps1`
-- Bundle upload: `backend/outputs/kaggle_dms_bundle/`
-- Dataset YAML local: `data/processed/dms_yolo_4class_v2/dms_dataset.yaml`
-- Audit: `data/processed/dms_yolo_4class_v2/audit_report.json`
+Upload toàn bộ nội dung thư mục:
 
-## Upload bằng giao diện web
+`backend/outputs/kaggle_dms_3class_v4_12k_bundle`
 
-1. Mở <https://www.kaggle.com/datasets> và chọn **New Dataset**.
-2. Đặt dataset ở chế độ **Private** trong lúc kiểm tra license.
-3. Upload toàn bộ file trong `backend/outputs/kaggle_dms_bundle/`.
-4. Sau khi dataset xử lý xong, mở <https://www.kaggle.com/code> → **New Notebook**.
-5. Chọn **File → Import Notebook**, upload file `.ipynb` trong bundle.
-6. Chọn **Add Input** và attach dataset vừa upload.
-7. Trong **Settings → Accelerator**, chọn GPU (ưu tiên P100 hoặc T4).
-8. Cấu hình một backend checkpoint thật theo mục bên dưới; cell `checkpoint_sync_ready.json` phải chạy thành công.
-9. Chạy lần lượt các cell kiểm tra môi trường/dataset trước. Khi audit đúng, chọn **Run All**.
-10. Cuối phiên, chọn **Save Version → Save & Run All**.
-11. Tải `dms_champion_artifacts.zip` ở tab **Output**. File chứa `best.pt`, `best.onnx` và `metrics_summary.json`.
+Các file chính:
 
-`/kaggle/working` chỉ là scratch disk. Notebook lưu `epoch_NNN.pt` sau từng epoch vào Google Drive, xác minh size/MD5 và tự tải epoch mới nhất để resume ở phiên sau. Không đặt một thư mục tên `drive` trong Kaggle output rồi coi đó là Google Drive.
+- `dms_yolo_3class_v4_12k.zip`
+- `yolo11m.pt`
+- `training_code.zip`
+- `kaggle_train_dms_3class_12k.ipynb`
+- `audit_report.json`
 
-Kaggle Upload Data có thể tự giải nén các file ZIP. Notebook v8 nhận cả hai dạng: file `dms_yolo_4class_v2.zip` hoặc thư mục đã giải nén chứa `dms_dataset.yaml`; `training_code` và `seatbelt_real_unlabelled` cũng được phát hiện tương tự.
+## Cách chạy
 
-Notebook v9 có profile thời gian dùng chung cho Kaggle/RTX 5090: base tối đa 4,5 giờ, fine-tune tối đa 0,5 giờ và dành phần còn lại của ngân sách 5,5 giờ cho test/export/upload. Ultralytics `time` override `epochs`, nhưng vẫn dừng sớm nếu hoàn thành đủ epoch trước giới hạn.
+1. Tạo Kaggle Dataset mới và upload toàn bộ bundle.
+2. Tạo Kaggle Notebook, chọn GPU T4 và attach dataset vừa tạo.
+3. Import `kaggle_train_dms_3class_12k.ipynb`.
+4. Chạy `Run All`.
+5. Notebook mặc định train YOLO11m ở 768 px, batch 8, tối đa 60 epoch, patience 12.
+6. Thời gian dự kiến khoảng 4–8 giờ tùy T4 và tốc độ I/O.
+7. Tải thư mục `/kaggle/working/dms_export` sau khi hoàn thành.
 
-## Checkpoint Google Drive
+Kết quả bắt buộc:
 
-Folder đích: <https://drive.google.com/drive/folders/1RfDV984zjw0Y5yfnxtnd7pPQhJpNczt_>.
+- `best.pt`
+- `metrics_summary.json`
+- `best.onnx` nếu bước export ONNX thành công
 
-### Cách 1 — Google Drive API
+## Thay model triển khai
 
-1. Bật Google Drive API trong Google Cloud Console và tạo OAuth Client loại **Desktop app**.
-2. Lấy refresh token của chính tài khoản có quyền Editor trên folder.
-3. Tạo Kaggle Secret `GDRIVE_OAUTH_JSON` theo mẫu trong notebook và bật secret cho notebook.
-4. Không dùng service account với My Drive cá nhân; chỉ dùng nó khi folder nằm trong Shared Drive và đã cấp quyền phù hợp.
-
-### Cách 2 — rclone dự phòng
-
-Trên máy Windows, chạy:
+Không chép đè thủ công. Chạy installer để kiểm class và metrics:
 
 ```powershell
-& "D:\.idea\project4\backend\scripts\setup_checkpoint_drive.ps1" -CopyKaggleSecret
+cd D:\.idea\project4\backend
+py -3 scripts\install_kaggle_dms_model.py `
+  --best-pt "C:\path\best.pt" `
+  --metrics "C:\path\metrics_summary.json" `
+  --best-onnx "C:\path\best.onnx"
 ```
 
-Script kiểm tra remote `gdrive`, folder ID và `H:\My Drive\project3_runs`, sau đó copy cấu hình base64 vào clipboard mà không in token. Dán giá trị clipboard vào Kaggle Secret `RCLONE_CONFIG_B64`. Khi Internet được bật, notebook chỉ cài `rclone` bằng apt nếu secret này thực sự tồn tại.
+Installer sẽ từ chối checkpoint không đúng ba lớp hoặc chưa đạt target, đồng thời backup model cũ trước khi thay.
 
-Notebook gọi remote thuần `gdrive:` và truyền folder đích qua biến backend chính thức `RCLONE_DRIVE_ROOT_FOLDER_ID`. Cách này tương thích với rclone cũ trong Kaggle và tránh lỗi `config name contains invalid characters` do connection-string chứa dấu phẩy.
+## Quy tắc đánh giá
 
-Notebook ưu tiên Drive API nếu cả hai cách đều được cấu hình. Nếu không xác minh được backend thật, notebook dừng trước cell train.
+- Metrics ảnh lấy trên test split, không lấy từ train/validation.
+- Benchmark video tính một quyết định cho mỗi video/event; không nhân kết quả với số frame.
+- Temporal voting dùng cửa sổ 12 frame: phone cần 5 vote, no-seatbelt cần 8 vote.
+- Driver-disjoint chưa thể chứng minh vì nguồn công khai không cung cấp driver ID đầy đủ. Hiện chỉ đảm bảo capture-group disjoint; dữ liệu thu mới phải có `camera_id`, `driver_id`, `capture_session_id`.
 
-### Thiết lập ổn định cho Kaggle
-
-- Mặc định `BATCH=8`, `WORKERS=2` để giảm lỗi CUDA OOM và DataLoader worker trên GPU T4/P100.
-- Notebook yêu cầu còn ít nhất 8 GiB trong `/kaggle/working` trước khi giải nén và train.
-- Ultralytics được giữ trong dải `>=8.3,<9`; bản Kaggle quá cũ hoặc từ major version khác sẽ được thay bằng bản tương thích.
-- Base detector và pseudo fine-tune có checkpoint/resume riêng. Checkpoint đã đủ epoch sẽ chuyển thẳng sang đánh giá, tránh lỗi `nothing to resume`.
-- Khi phiên mới không còn `best.pt` local, notebook tải `best.pt` đã xác minh từ Google Drive; chỉ dùng epoch/last checkpoint làm fallback.
-
-## Tránh lỗi `raytune` trên Kaggle
-
-- Không thêm `raytune=False` vào `model.train(...)`; đây không phải tham số train.
-- Không ghi `{"raytune": False}` vào file JSON (`False` không phải cú pháp JSON).
-- Notebook cập nhật `settings` theo schema của đúng phiên bản Ultralytics đang chạy. Bản có khóa `raytune` sẽ đặt nó thành `False`; bản cũ thiếu khóa sẽ báo `safe skip` và tiếp tục.
-- Pipeline chỉ gọi `model.train()`, không gọi `model.tune(use_ray=True)`, nên không cần cài package `ray[tune]`.
-
-## Train hai giai đoạn
-
-1. Base detector train bằng ba nguồn có bounding box.
-2. Đánh giá base trên test group-disjoint.
-3. Base teacher pseudo-label 8 ảnh Seatbelt Real; AUC phone-candidate chỉ bật khi có quyền truy cập/mật khẩu hợp lệ, với `conf >= 0.72`.
-4. Fine-tune ngắn, giữ nguyên gold validation/test.
-5. Chọn checkpoint có `min(mAP50, macro-F1)` cao hơn giữa base và fine-tune.
-
-Nếu GPU hết giờ, giảm theo thứ tự: `IMG_SIZE 640`, `EPOCHS 60`, `MODEL_NAME yolo11s.pt`. Không giảm test integrity hoặc trộn test vào train.
-
-## Nguồn dữ liệu
-
-- Roboflow Primary: <https://universe.roboflow.com/ladailoc-yzh0x/phone-detect-svavs>
-- Roboflow Seatbelt & Mobile: <https://universe.roboflow.com/aiactive20092009-gmail-com/seat_belt-and-mobile>
-- DMS Safety: <https://www.kaggle.com/datasets/habbas11/dms-driver-monitoring-system>
-- AUC Distracted Driver: <https://www.kaggle.com/datasets/tejakalepalle/auc-distracted-driver-dataset-v1>
-- Seatbelt Real: <https://www.kaggle.com/datasets/alexandresintes/seatbelt-detection-dataset-real-car-photos>
-
-## Bảo mật
-
-API key Roboflow cũ từng được lưu trực tiếp trong source/notebook đã được thay bằng biến môi trường. Hãy revoke/rotate key cũ trên Roboflow trước khi đưa repository lên GitHub.
-
-AUC v2 không nằm trong bundle upload: license của MI-AUC cấm chuyển giao/phân phối nếu chưa được cho phép. Hãy xin quyền truy cập từ tác giả và lưu password trong Kaggle Secrets với tên `AUC_ZIP_PASSWORD`; không ghi password vào notebook.
+Chi tiết kỹ thuật và quy trình triển khai nằm trong `backend/docs/dms_12k_kaggle_and_deployment.md`.

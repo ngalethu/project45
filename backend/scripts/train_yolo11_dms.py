@@ -19,9 +19,9 @@ import yaml
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = BACKEND_DIR.parent
-LOCAL_DATASET_YAML = PROJECT_ROOT / "data" / "processed" / "dms_yolo_4class_v2" / "dms_dataset.yaml"
+LOCAL_DATASET_YAML = PROJECT_ROOT / "data" / "processed" / "dms_yolo_3class_v4_12k" / "dms_dataset.yaml"
 LOCAL_OUTPUT_DIR = BACKEND_DIR / "outputs" / "runs_dms"
-EXPECTED_NAMES = ["phone", "seatbelt", "no-seatbelt", "smoking"]
+EXPECTED_NAMES = ["phone", "seatbelt", "no-seatbelt"]
 
 
 def configure_ultralytics_settings(settings: Any) -> dict[str, bool]:
@@ -54,7 +54,7 @@ def validate_dataset_yaml(yaml_path: Path) -> dict:
     if names != EXPECTED_NAMES:
         raise ValueError(f"Expected class order {EXPECTED_NAMES}, got {names} in {yaml_path}")
     if int(data.get("nc", len(names))) != len(EXPECTED_NAMES):
-        raise ValueError(f"Expected nc=4 in {yaml_path}")
+        raise ValueError(f"Expected nc={len(EXPECTED_NAMES)} in {yaml_path}")
     for split in ("train", "val", "test"):
         if split not in data:
             raise ValueError(f"Dataset YAML is missing '{split}': {yaml_path}")
@@ -79,7 +79,7 @@ def get_dataset_yaml_path(explicit: str | Path | None = None) -> Path:
             return candidate.resolve()
         except (FileNotFoundError, ValueError) as exc:
             errors.append(str(exc))
-    raise FileNotFoundError("No valid four-class DMS dataset YAML found. " + " | ".join(errors))
+    raise FileNotFoundError("No valid three-class DMS dataset YAML found. " + " | ".join(errors))
 
 
 def make_runtime_yaml(dataset_yaml: Path, run_dir: Path) -> Path:
@@ -149,7 +149,7 @@ def train_dms_model(
     img_size: int = 768,
     model_weights: str = "yolo11m.pt",
     output_dir: str | Path | None = None,
-    run_name: str = "yolo11m_dms_4class_768",
+    run_name: str = "yolo11m_dms_3class_v4_12k_768",
     device: str | None = None,
     workers: int = 4,
     patience: int = 25,
@@ -172,7 +172,7 @@ def train_dms_model(
     starting_weights = str(resume or model_weights)
 
     print("=" * 78)
-    print("YOLO11 DMS FOUR-CLASS TRAINING")
+    print("YOLO11 DMS THREE-CLASS TRAINING")
     print(f"dataset={selected_yaml}")
     print(f"model={starting_weights} device={selected_device} epochs={epochs} imgsz={img_size} batch={batch_size}")
     print(f"output={run_dir}")
@@ -274,7 +274,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch", type=int, default=-1)
     parser.add_argument("--imgsz", type=int, default=768)
     parser.add_argument("--output-dir", type=Path)
-    parser.add_argument("--name", default="yolo11m_dms_4class_768")
+    parser.add_argument("--name", default="yolo11m_dms_3class_v4_12k_768")
     parser.add_argument("--device")
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--patience", type=int, default=25)

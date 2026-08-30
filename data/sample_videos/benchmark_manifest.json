@@ -1,0 +1,171 @@
+{
+  "schema_version": 3,
+  "evaluation_unit": "video-level multi-label event presence",
+  "notes": "Twenty visually audited real-person videos. Phone use means handheld/ear use by the driver; mounted navigation and passenger phone use are hard negatives.",
+  "license": {
+    "name": "Pexels License",
+    "url": "https://www.pexels.com/license/"
+  },
+  "videos": [
+    {
+      "file": "pexels_driver_phone.mp4",
+      "events": ["using_phone", "no_seatbelt"],
+      "category": "driver_phone_day_vertical",
+      "camera_id": "pexels_5834561",
+      "source_url": "https://www.pexels.com/video/man-on-a-driving-seat-and-talking-on-phone-5834561/",
+      "audit": "Driver holds phone at ear; upper torso has no visible diagonal belt."
+    },
+    {
+      "file": "pexels_driver_distracted_phone_1.mp4",
+      "events": ["using_phone", "no_seatbelt"],
+      "category": "driver_phone_day_landscape",
+      "camera_id": "pexels_6637301",
+      "source_url": "https://www.pexels.com/video/a-man-talking-on-the-cell-phone-inside-the-vehicle-6637301/",
+      "audit": "Driver holds phone at ear; chest visible without diagonal belt."
+    },
+    {
+      "file": "pexels_driver_phone_rain_5290305.mp4",
+      "events": ["using_phone"],
+      "category": "driver_phone_rain_side",
+      "camera_id": "pexels_5290305",
+      "source_url": "https://www.pexels.com/video/man-answering-a-call-while-driving-5290305/",
+      "audit": "Driver holds phone at ear while moving in rainy conditions; belt state is not scored."
+    },
+    {
+      "file": "pexels_driver_notes_8943623.mp4",
+      "events": ["no_seatbelt"],
+      "category": "no_seatbelt_rear_cabin",
+      "camera_id": "pexels_8943623",
+      "source_url": "https://www.pexels.com/video/man-inside-a-car-sitting-in-driver-s-seat-8943623/",
+      "audit": "Driver torso visible from rear cabin without a diagonal belt."
+    },
+    {
+      "file": "pexels_seatbelt_positive_5391318_belted.mp4",
+      "events": ["normal"],
+      "category": "seatbelt_positive_side",
+      "camera_id": "pexels_5391318",
+      "source_url": "https://www.pexels.com/video/young-woman-putting-on-seat-belt-5391318/",
+      "audit": "Curated 8-20 second segment after fastening; visible-belt control without the preceding unbelted transition."
+    },
+    {
+      "file": "pexels_tunnel_dashboard_11269279.mp4",
+      "events": ["normal"],
+      "category": "normal_tunnel_dashboard",
+      "camera_id": "pexels_11269279",
+      "source_url": "https://www.pexels.com/video/view-from-car-interior-driving-in-tunnel-11269279/",
+      "audit": "Tunnel lighting, navigation display and windshield reflections as hard negatives."
+    },
+    {
+      "file": "pexels_normal_dusk_13802598.mp4",
+      "events": ["normal"],
+      "category": "normal_dusk_dashboard",
+      "camera_id": "pexels_13802598",
+      "source_url": "https://www.pexels.com/video/a-person-driving-a-car-13802598/",
+      "audit": "Hands on wheel; dashboard screen is a phone-like hard negative."
+    },
+    {
+      "file": "pexels_woman_driver_day_9035107.mp4",
+      "events": ["normal"],
+      "category": "normal_day_reflection",
+      "camera_id": "pexels_9035107",
+      "source_url": "https://www.pexels.com/video/a-woman-smiling-while-sitting-on-a-car-seat-9035107/",
+      "audit": "Driver seen through exterior reflections; no handheld phone behavior."
+    },
+    {
+      "file": "pexels_driver_night_neon_8470705.mp4",
+      "events": ["normal"],
+      "category": "normal_night_neon_side",
+      "camera_id": "pexels_8470705",
+      "source_url": "https://www.pexels.com/video/video-of-a-man-inside-the-car-8470705/",
+      "audit": "Real driver under changing neon illumination; no phone."
+    },
+    {
+      "file": "pexels_woman_night_seatbelt_13802602.mp4",
+      "events": ["normal"],
+      "category": "normal_night_rear_cabin",
+      "camera_id": "pexels_13802602",
+      "source_url": "https://www.pexels.com/video/a-woman-using-car-13802602/",
+      "audit": "Rear-cabin view with hands on wheel and dashboard clutter."
+    },
+    {
+      "file": "pexels_tired_driver_night_9531464.mp4",
+      "events": ["normal"],
+      "category": "normal_night_face_close",
+      "camera_id": "pexels_9531464",
+      "source_url": "https://www.pexels.com/video/a-tired-man-driving-a-car-9531464/",
+      "audit": "Low-light close frontal driver view; no handheld phone."
+    },
+    {
+      "file": "pexels_driver_night_pov_6331328.mp4",
+      "events": ["normal"],
+      "category": "normal_night_pov",
+      "camera_id": "pexels_6331328",
+      "source_url": "https://www.pexels.com/video/man-driving-a-car-6331328/",
+      "audit": "POV hands and dashboard at night; driver face largely absent."
+    },
+    {
+      "file": "pexels_driver_rain_12601920.mp4",
+      "events": ["normal"],
+      "category": "normal_rain_dashboard",
+      "camera_id": "pexels_12601920",
+      "source_url": "https://www.pexels.com/video/man-driving-a-car-during-rain-12601920/",
+      "audit": "Rain, wipers and reflections with hands on wheel."
+    },
+    {
+      "file": "pexels_night_highway_33931911.mp4",
+      "events": ["normal"],
+      "category": "normal_extreme_low_light",
+      "camera_id": "pexels_33931911",
+      "source_url": "https://www.pexels.com/video/night-highway-drive-from-car-interior-view-33931911/",
+      "audit": "Extreme low-light dashboard and windshield hard negative."
+    },
+    {
+      "file": "pexels_phone_night_17770576.mp4",
+      "events": ["normal"],
+      "category": "hard_negative_mounted_phone_night",
+      "camera_id": "pexels_17770576",
+      "source_url": "https://www.pexels.com/video/a-car-driving-at-night-with-a-phone-in-the-driver-s-hand-17770576/",
+      "audit": "Phone is mounted near the windshield; no handheld driver-phone association."
+    },
+    {
+      "file": "pexels_driver_phone_gps_5043943.mp4",
+      "events": ["normal"],
+      "category": "hard_negative_mounted_phone_day",
+      "camera_id": "pexels_5043943",
+      "source_url": "https://www.pexels.com/video/person-driving-using-gps-navigation-system-on-a-smartphone-5043943/",
+      "audit": "Mounted navigation phone near steering wheel; not handheld phone use."
+    },
+    {
+      "file": "pexels_woman_phone_gps_12769422.mp4",
+      "events": ["normal"],
+      "category": "hard_negative_mounted_phone_woman",
+      "camera_id": "pexels_12769422",
+      "source_url": "https://www.pexels.com/video/woman-driving-car-12769422/",
+      "audit": "Mounted navigation phone and hands on wheel; not handheld use."
+    },
+    {
+      "file": "pexels_passenger_phone_4612656.mp4",
+      "events": ["normal"],
+      "category": "hard_negative_passenger_phone_front",
+      "camera_id": "pexels_4612656",
+      "source_url": "https://www.pexels.com/video/a-man-and-woman-in-a-car-talking-on-the-phone-4612656/",
+      "audit": "Passenger uses phone while driver keeps hands on wheel."
+    },
+    {
+      "file": "pexels_backseat_texting_3048163.mp4",
+      "events": ["normal"],
+      "category": "hard_negative_passenger_texting_rear",
+      "camera_id": "pexels_3048163",
+      "source_url": "https://www.pexels.com/video/woman-at-the-backseat-of-a-car-and-texting-3048163/",
+      "audit": "Back-seat passenger texting; must not become a driver violation."
+    },
+    {
+      "file": "pexels_passenger_phone_suit_5520072.mp4",
+      "events": ["normal"],
+      "category": "hard_negative_passenger_phone_close",
+      "camera_id": "pexels_5520072",
+      "source_url": "https://www.pexels.com/video/businessman-man-suit-sunglasses-5520072/",
+      "audit": "Passenger phone close-up with no driver association."
+    }
+  ]
+}

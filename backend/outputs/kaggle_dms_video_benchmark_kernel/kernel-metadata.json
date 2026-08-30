@@ -1,0 +1,16 @@
+{
+  "id": "lethunga/benchmark-dms-yolo11m-three-class-videos",
+  "title": "Benchmark DMS YOLO11m Three Class Videos",
+  "code_file": "benchmark_dms_kaggle.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": "true",
+  "enable_gpu": "true",
+  "enable_internet": "true",
+  "dataset_sources": [
+    "lethunga/dms-yolo11m-three-class-checkpoint-20260830",
+    "lethunga/dms-private-video-benchmark-inputs"
+  ],
+  "competition_sources": [],
+  "kernel_sources": []
+}

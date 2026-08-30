@@ -5,7 +5,7 @@ import urllib.request
 import urllib.parse
 import json
 
-OUTPUT_DIR = "backend/data/sample_videos"
+OUTPUT_DIR = "data/sample_videos"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Direct high quality Pexels royalty free MP4 video CDN links for real drivers
@@ -19,11 +19,6 @@ PEXELS_VIDEOS = [
         "name": "pexels_driver_seatbelt.mp4",
         "search_term": "person driving car seatbelt",
         "fallback_url": "https://videos.pexels.com/video-files/3052843/3052843-sd_640_360_30fps.mp4"
-    },
-    {
-        "name": "pexels_driver_smoking.mp4",
-        "search_term": "person smoking in car",
-        "fallback_url": "https://videos.pexels.com/video-files/6863806/6863806-sd_640_360_25fps.mp4"
     },
     {
         "name": "pexels_driver_normal.mp4",

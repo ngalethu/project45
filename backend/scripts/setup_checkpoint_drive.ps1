@@ -14,8 +14,8 @@ if (-not (Get-Command rclone -ErrorAction SilentlyContinue)) {
 
 $remoteRoot = "${RemoteName},root_folder_id=${FolderId}:"
 $runNames = @(
-    "yolo11m_dms_4class_base",
-    "yolo11m_dms_4class_pseudo_finetune",
+    "yolo11m_dms_3class_v3_base",
+    "yolo11m_dms_3class_v3_pseudo_finetune",
     "champion_artifacts"
 )
 

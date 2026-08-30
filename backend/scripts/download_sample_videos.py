@@ -14,11 +14,6 @@ PUBLIC_VIDEO_SOURCES = [
         "event_type": "using_phone"
     },
     {
-        "filename": "smoking_driver.mp4",
-        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-        "event_type": "smoking"
-    },
-    {
         "filename": "no_seatbelt_driver.mp4",
         "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
         "event_type": "no_seatbelt"
@@ -62,11 +57,6 @@ def generate_synthetic_driver_video(output_path: str, event_type: str, num_frame
             cv2.line(img, (400, 350), (hand_x + 30, hand_y), (100, 116, 139), 12)
             cv2.rectangle(img, (hand_x + 20, hand_y - 30), (hand_x + 45, hand_y + 20), (0, 0, 220), -1)
             cv2.putText(img, "USING PHONE DETECTED", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-        elif event_type == "smoking":
-            # Hand with cigarette near mouth
-            cv2.line(img, (400, 350), (360 + int(np.sin(f/5)*10), head_y + 35), (100, 116, 139), 10)
-            cv2.rectangle(img, (350 + int(np.sin(f/5)*10), head_y + 32), (370 + int(np.sin(f/5)*10), head_y + 38), (200, 200, 255), -1)
-            cv2.putText(img, "SMOKING DETECTED", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (168, 85, 247), 2)
         elif event_type == "no_seatbelt":
             # Missing seatbelt strap across shoulder
             cv2.putText(img, "NO SEATBELT WARNING", (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 215, 255), 2)

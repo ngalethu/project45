@@ -20,7 +20,7 @@ $runs = [IO.Path]::GetFullPath($RunsRoot)
 $requiredFiles = @(
     (Join-Path $project "backend\driver_behavior_yolo11m_mediapipe_minimal_stable.ipynb"),
     (Join-Path $project "backend\yolo11m.pt"),
-    (Join-Path $project "data\processed\dms_yolo_4class_v2\dms_dataset.yaml")
+    (Join-Path $project "data\processed\dms_yolo_3class_v3_curated\dms_dataset.yaml")
 )
 $missing = @($requiredFiles | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
 if ($missing.Count -gt 0) {

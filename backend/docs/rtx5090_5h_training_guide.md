@@ -29,7 +29,7 @@ Chép nguyên dự án sang ổ SSD/NVMe của máy thuê, không train trực t
 project4/
   backend/driver_behavior_yolo11m_mediapipe_minimal_stable.ipynb
   backend/yolo11m.pt
-  data/processed/dms_yolo_4class_v2/dms_dataset.yaml
+  data/processed/dms_yolo_3class_v3_curated/dms_dataset.yaml
 ```
 
 Nếu vị trí khác, mở PowerShell dùng để khởi động Jupyter và đặt:
@@ -98,7 +98,7 @@ CUDA matmul probe: OK
 Sau epoch đầu:
 
 ```text
-[RCLONE OK] yolo11m_dms_4class_base/epoch_001.pt
+[RCLONE OK] yolo11m_dms_3class_v3_base/epoch_001.pt
 ```
 
 Khi hết thời gian, tải `champion_artifacts/best.pt`, `best.onnx` và `metrics_summary.json`, hoặc lấy các file đã đồng bộ trên Google Drive.

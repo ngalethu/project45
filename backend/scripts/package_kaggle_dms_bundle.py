@@ -11,11 +11,10 @@ from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = BACKEND_DIR.parent
-DEFAULT_DATASET = PROJECT_ROOT / "data" / "processed" / "dms_yolo_4class_v2"
-DEFAULT_SEATBELT = Path.home() / "Downloads" / "archive (1).zip"
+DEFAULT_DATASET = PROJECT_ROOT / "data" / "processed" / "dms_yolo_3class_v4_12k"
 DEFAULT_MODEL = BACKEND_DIR / "yolo11m.pt"
-DEFAULT_NOTEBOOK = BACKEND_DIR / "driver_behavior_yolo11m_mediapipe_minimal_stable.ipynb"
-DEFAULT_OUTPUT = BACKEND_DIR / "outputs" / "kaggle_dms_bundle"
+DEFAULT_NOTEBOOK = BACKEND_DIR / "kaggle_train_dms_3class_12k.ipynb"
+DEFAULT_OUTPUT = BACKEND_DIR / "outputs" / "kaggle_dms_3class_v4_12k_bundle"
 
 
 def _link_or_copy(source: Path, destination: Path) -> None:
@@ -29,7 +28,7 @@ def _link_or_copy(source: Path, destination: Path) -> None:
 
 def zip_dataset(dataset_dir: Path, archive_path: Path) -> None:
     if archive_path.exists():
-        return
+        archive_path.unlink()
     files = sorted(path for path in dataset_dir.rglob("*") if path.is_file())
     with zipfile.ZipFile(archive_path, "w", allowZip64=True) as archive:
         for index, path in enumerate(files, start=1):
@@ -43,8 +42,8 @@ def zip_dataset(dataset_dir: Path, archive_path: Path) -> None:
 def zip_training_code(archive_path: Path) -> None:
     scripts = (
         BACKEND_DIR / "scripts" / "train_yolo11_dms.py",
-        BACKEND_DIR / "scripts" / "pseudo_label_weak_dms_sources.py",
-        BACKEND_DIR / "scripts" / "prepare_dms_dataset.py",
+        BACKEND_DIR / "scripts" / "install_kaggle_dms_model.py",
+        BACKEND_DIR / "scripts" / "build_dms_3class_12k.py",
     )
     with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for script in scripts:
@@ -53,13 +52,12 @@ def zip_training_code(archive_path: Path) -> None:
 
 def build_bundle(
     dataset_dir: Path = DEFAULT_DATASET,
-    seatbelt_archive: Path = DEFAULT_SEATBELT,
     model_path: Path = DEFAULT_MODEL,
     notebook_path: Path = DEFAULT_NOTEBOOK,
     output_dir: Path = DEFAULT_OUTPUT,
     kaggle_username: str = "YOUR_KAGGLE_USERNAME",
 ) -> dict:
-    required = (dataset_dir, seatbelt_archive, model_path, notebook_path)
+    required = (dataset_dir, model_path, notebook_path)
     missing = [str(path) for path in required if not path.exists()]
     if missing:
         raise FileNotFoundError("Missing bundle inputs: " + ", ".join(missing))
@@ -71,22 +69,27 @@ def build_bundle(
     if restricted_bundle_copy.exists():
         restricted_bundle_copy.unlink()
 
-    dataset_zip = output_dir / "dms_yolo_4class_v2.zip"
+    dataset_zip = output_dir / f"{dataset_dir.name}.zip"
     zip_dataset(dataset_dir, dataset_zip)
-    _link_or_copy(seatbelt_archive, output_dir / "seatbelt_real_unlabelled.zip")
     _link_or_copy(model_path, output_dir / "yolo11m.pt")
     shutil.copy2(notebook_path, output_dir / notebook_path.name)
     zip_training_code(output_dir / "training_code.zip")
     shutil.copy2(dataset_dir / "audit_report.json", output_dir / "audit_report.json")
+    for manifest_path in (
+        PROJECT_ROOT / "data" / "sources" / "multidomain_source_manifest.json",
+        PROJECT_ROOT / "data" / "evaluation" / "seatbelt_real_external_manifest.json",
+    ):
+        if manifest_path.exists():
+            shutil.copy2(manifest_path, output_dir / manifest_path.name)
 
     metadata = {
-        "title": "DMS YOLO11 Multisource Four Class",
-        "id": f"{kaggle_username}/dms-yolo11-multisource-four-class",
+        "title": "DMS YOLO11 Three Class 12K",
+        "id": f"{kaggle_username}/dms-yolo11-three-class-12k",
         "licenses": [{"name": "other"}],
-        "subtitle": "Harmonized phone seatbelt no-seatbelt and smoking training bundle",
+        "subtitle": "Leakage-aware 12k phone seatbelt and no-seatbelt bundle",
         "description": (
-            "Four-class DMS training bundle with source-specific label mappings, "
-            "group-disjoint splits, adaptive CLAHE and weak-source archives. "
+            "Smoking-free three-class DMS bundle with exactly 12,000 training images, "
+            "one image per capture group, group-disjoint splits and curated negatives. "
             "Source licenses remain applicable; see the notebook and audit report."
         ),
         "keywords": ["computer-vision", "object-detection", "driver-monitoring", "yolo"],
@@ -94,12 +97,6 @@ def build_bundle(
     (output_dir / "dataset-metadata.json").write_text(
         json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    (output_dir / "AUC_NOT_INCLUDED.txt").write_text(
-        "AUC v2 is encrypted and its license prohibits redistribution. "
-        "Obtain authorized access/password from MI-AUC and attach it separately.\n",
-        encoding="utf-8",
-    )
-
     files = []
     for path in sorted(output_dir.iterdir()):
         if path.is_file():
@@ -120,7 +117,6 @@ def build_bundle(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset-dir", type=Path, default=DEFAULT_DATASET)
-    parser.add_argument("--seatbelt-archive", type=Path, default=DEFAULT_SEATBELT)
     parser.add_argument("--model", type=Path, default=DEFAULT_MODEL)
     parser.add_argument("--notebook", type=Path, default=DEFAULT_NOTEBOOK)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
@@ -132,7 +128,6 @@ if __name__ == "__main__":
     args = parse_args()
     build_bundle(
         dataset_dir=args.dataset_dir,
-        seatbelt_archive=args.seatbelt_archive,
         model_path=args.model,
         notebook_path=args.notebook,
         output_dir=args.output_dir,

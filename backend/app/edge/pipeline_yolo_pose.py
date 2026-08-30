@@ -13,6 +13,7 @@ from app.edge.alert_manager import AlertManager
 from app.edge.behavior_rules import BehaviorRules
 from app.edge.edge_api_client import EdgeApiClient
 from app.edge.evidence_writer import EvidenceWriter
+from app.edge.hierarchical_dms import run_hierarchical_dms
 from app.edge.overlay_renderer import OverlayRenderer
 from app.edge.pose_estimator import PoseEstimator
 from app.edge.video_source import VideoSource
@@ -21,11 +22,9 @@ from app.edge.upload_queue import UploadQueue
 
 # ── Frame-based bbox/alert hold constants ─────────────────────────
 BBOX_HOLD_FRAMES = 2              # Giữ bbox tối đa 2 frame sau khi mất detection
-SMOKE_DEBOUNCE_FRAMES = 2         # Cần thấy smoking >= 2 frame liên tục mới hiện bbox
 
 # Alert text hold — MỖI CLASS có TTL riêng (rất khác bbox)
 ALERT_HOLD_FRAMES: dict = {
-    "smoking": 45,                # ~2.2 giây @ 20 FPS
     "no_seatbelt": 60,            # ~3 giây @ 20 FPS (trạng thái liên tục, giữ lâu hơn)
     "using_phone": 45,            # ~2.2 giây @ 20 FPS
 }
@@ -41,6 +40,21 @@ class EdgePipeline:
             conf=self.cfg["edge"]["conf_threshold"],
             iou=self.cfg["edge"]["iou_threshold"],
         )
+
+        self.vehicle_detector = None
+        hierarchy_cfg = self.cfg.get("hierarchy", {})
+        if hierarchy_cfg.get("enabled", False) and hierarchy_cfg.get("vehicle_stage_enabled", True):
+            configured = Path(self.cfg["models"].get("vehicle_yolo_path", "yolo11m.pt"))
+            candidates = [configured, Path(__file__).resolve().parents[2] / configured]
+            vehicle_path = next((path for path in candidates if path.exists()), None)
+            if vehicle_path is not None:
+                self.vehicle_detector = YoloDetector(
+                    model_path=str(vehicle_path),
+                    conf=float(hierarchy_cfg.get("vehicle_conf_threshold", 0.30)),
+                    iou=float(hierarchy_cfg.get("vehicle_iou_threshold", 0.50)),
+                )
+            else:
+                self.logger.warning("Vehicle model not found; using cabin/full-frame fallback")
 
         self.pose_estimator = None
         if self.cfg["pose"]["enabled"]:
@@ -91,7 +105,6 @@ class EdgePipeline:
     def _has_relevant_detection(self, detections) -> bool:
         relevant_names = {
             "phone",
-            "smoking",
             "seatbelt",
             "no-seatbelt",
             "no_seatbelt",
@@ -187,20 +200,12 @@ class EdgePipeline:
             del self.active_alerts[etype]
 
     def _get_detections_for_render(self, frame_index: int) -> List[Detection]:
-        """Lấy danh sách detection để render từ bbox_cache.
-        Chỉ trả về entry còn hạn (trong BBOX_HOLD_FRAMES).
-        Áp dụng debounce cho smoking: cần >= SMOKE_DEBOUNCE_FRAMES frame liên tục.
-        """
+        """Return non-expired detections from the frame-based cache."""
         result: List[Detection] = []
-        smoking_in_frame = False
 
         for entry in self.bbox_cache.values():
             if frame_index - entry["last_seen_frame"] > BBOX_HOLD_FRAMES:
                 continue
-
-            # Smoking debounce: đếm số frame liên tục có smoking
-            if entry["class_name"] == "smoking":
-                smoking_in_frame = True
 
             result.append(Detection(
                 class_id=0,
@@ -208,16 +213,6 @@ class EdgePipeline:
                 confidence=entry["confidence"],
                 bbox=entry["bbox"],
             ))
-
-        # Cập nhật smoking debounce counter
-        if smoking_in_frame:
-            self.smoking_frame_count += 1
-        else:
-            self.smoking_frame_count = 0
-
-        # Lọc smoking: chỉ hiện bbox nếu đủ frame liên tục
-        if self.smoking_frame_count < SMOKE_DEBOUNCE_FRAMES:
-            result = [d for d in result if d.class_name != "smoking"]
 
         return result
 
@@ -268,7 +263,6 @@ class EdgePipeline:
         frame_index = 0
         self.bbox_cache: Dict[str, dict] = {}      # frame-based bbox cache
         self.active_alerts: Dict[str, dict] = {}    # frame-based alert cache
-        self.smoking_frame_count = 0                 # smoking debounce counter
         fps_smooth = None
 
         fps_values = []
@@ -280,6 +274,7 @@ class EdgePipeline:
 
         detect_every = max(1, int(self.cfg["edge"].get("detect_every_n_frames", 2)))
         last_detections = []
+        last_pose = PoseResult(points={})
 
         self.logger.info("Starting edge pipeline...")
 
@@ -300,7 +295,15 @@ class EdgePipeline:
                 frame = self._resize_frame_if_needed(frame)
 
                 if detect_every <= 1 or frame_index % detect_every == 1 or not last_detections:
-                    detections = self.detector.predict(frame, imgsz=self.cfg["edge"].get("resize_width", 640))
+                    hierarchy = run_hierarchical_dms(
+                        frame=frame,
+                        dms_detector=self.detector,
+                        pose_estimator=self.pose_estimator,
+                        vehicle_detector=self.vehicle_detector,
+                        config=self.cfg.get("hierarchy", {}),
+                    )
+                    detections = hierarchy.detections
+                    last_pose = hierarchy.pose
                     last_detections = detections
                 else:
                     detections = last_detections
@@ -308,7 +311,7 @@ class EdgePipeline:
                 # Cập nhật bbox_cache theo frame (không dùng time.time())
                 self._update_bbox_cache(detections, frame_index)
 
-                pose = self._get_pose_for_frame(frame, frame_index, detections)
+                pose = last_pose
 
                 candidates = self.rules.infer(detections, pose, frame.shape)
 
@@ -333,7 +336,7 @@ class EdgePipeline:
                 # Lưu frame GỐC (không overlay) cho SlowFast verification
                 self.evidence_writer.push_original_frame(frame)
 
-                # Lấy detections từ cache (đã lọc theo frame + smoking debounce)
+                # Lấy detections còn hạn từ cache để render ổn định.
                 render_detections = self._get_detections_for_render(frame_index)
 
                 # Render frame với overlay (bbox khoanh vùng vi phạm)

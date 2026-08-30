@@ -1,0 +1,15 @@
+{
+  "title": "DMS Private Video Benchmark Inputs",
+  "id": "lethunga/dms-private-video-benchmark-inputs",
+  "licenses": [
+    {
+      "name": "other"
+    }
+  ],
+  "subtitle": "Private event-level DMS benchmark videos and pipeline code",
+  "description": "Private benchmark manifest, 20 visually audited real-person Pexels videos, and the DMS evaluation code required for reproducible video-level multi-label testing. Includes handheld-phone positives, mounted/passenger phone hard negatives, seatbelt controls, rain, night, reflections, and varied camera views.",
+  "keywords": [
+    "video",
+    "driver-monitoring"
+  ]
+}

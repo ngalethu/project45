@@ -5,7 +5,7 @@ import urllib.parse
 import os
 import cv2
 
-OUTPUT_DIR = "backend/data/sample_videos"
+OUTPUT_DIR = "data/sample_videos"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 QUERIES = [
@@ -14,8 +14,6 @@ QUERIES = [
     "driver mobile",
     "driver seatbelt",
     "car seatbelt",
-    "driver smoking",
-    "smoking car",
     "drowsy driver",
     "yawning driver",
     "distracted driver",

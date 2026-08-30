@@ -1,34 +1,35 @@
 from __future__ import annotations
+from collections import deque
 from typing import Dict, List
-from app.common.constants import EVENT_NO_SEATBELT, EVENT_SMOKING, EVENT_USING_PHONE
+from app.common.constants import EVENT_NO_SEATBELT, EVENT_USING_PHONE
 from app.common.types import AlertEvent, CandidateEvent
-
-# Cooldown giữa 2 lần alert cùng loại (quy đổi giây → frame, giả sử ~20 FPS)
-ALERT_COOLDOWN_FRAMES = 80   # ~4 giây × 20 FPS
-
 
 class AlertManager:
     def __init__(self, config: Dict):
         self.cfg = config
-        self.counts = {
-            EVENT_USING_PHONE: 0,
-            EVENT_SMOKING: 0,
-            EVENT_NO_SEATBELT: 0,
+        self.event_types = (EVENT_USING_PHONE, EVENT_NO_SEATBELT)
+        self.window_frames = int(self.cfg["rules"].get("temporal_window_frames", 12))
+        if not 5 <= self.window_frames <= 15:
+            raise ValueError("rules.temporal_window_frames must be between 5 and 15")
+        self.histories = {
+            event_type: deque(maxlen=self.window_frames) for event_type in self.event_types
         }
+        self.cooldown_frames = int(self.cfg["rules"].get("temporal_cooldown_frames", 80))
         # Frame-based cooldown (thay cho time-based last_fired_sec)
         self.last_fired_frame = {
             EVENT_USING_PHONE: -9999,
-            EVENT_SMOKING: -9999,
             EVENT_NO_SEATBELT: -9999,
         }
 
     def _need_frames(self, event_type: str) -> int:
         mapping = {
             EVENT_USING_PHONE: self.cfg["rules"]["phone_confirm_frames"],
-            EVENT_SMOKING: self.cfg["rules"]["smoking_confirm_frames"],
             EVENT_NO_SEATBELT: self.cfg["rules"]["no_seatbelt_confirm_frames"],
         }
-        return mapping[event_type]
+        needed = int(mapping[event_type])
+        if not 1 <= needed <= self.window_frames:
+            raise ValueError(f"Invalid temporal vote requirement for {event_type}: {needed}")
+        return needed
 
     def update(
         self,
@@ -45,27 +46,26 @@ class AlertManager:
 
         alerts: List[AlertEvent] = []
 
-        for event_type in self.counts.keys():
+        for event_type in self.event_types:
             cand = candidate_map.get(event_type)
-            if cand:
-                self.counts[event_type] += 1
-            else:
-                self.counts[event_type] = max(0, self.counts[event_type] - 1)
+            history = self.histories[event_type]
+            history.append(cand)
+            votes = [item for item in history if item is not None]
 
-            if cand and self.counts[event_type] >= self._need_frames(event_type):
-                # Cooldown theo frame (không dùng time.time())
-                if frame_index - self.last_fired_frame[event_type] >= ALERT_COOLDOWN_FRAMES:
+            if len(votes) >= self._need_frames(event_type):
+                if frame_index - self.last_fired_frame[event_type] >= self.cooldown_frames:
+                    best = max(votes, key=lambda item: item.score)
                     alerts.append(
                         AlertEvent(
                             event_type=event_type,
-                            confidence=cand.score,
+                            confidence=best.score,
                             frame_index=frame_index,
                             timestamp=timestamp_iso,
-                            bbox=cand.bbox,
-                            note=cand.note,
+                            bbox=best.bbox,
+                            note=f"temporal_votes={len(votes)}/{len(history)}; {best.note}",
                             source_device=source_device,
                         )
                     )
                     self.last_fired_frame[event_type] = frame_index
-                    self.counts[event_type] = 0
+                    history.clear()
         return alerts

@@ -56,3 +56,6 @@ backend/data/
 .codegraph/
 .gitnexus/
 .claude/settings.local.json
+
+# Optional third-party reference repositories
+.external/

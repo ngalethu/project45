@@ -3,6 +3,7 @@ app:
 
 models:
   yolo_path: "models/best.pt"
+  vehicle_yolo_path: "yolo11m.pt"
 
 edge:
   source: "data/sample_videos/test.mp4"
@@ -17,7 +18,7 @@ edge:
   buffer_size: 64
   alert_cooldown_sec: 4
   show_window: true
-  resize_width: 640
+  resize_width: 768
   pose_every_n_frames: 3
   detect_every_n_frames: 2
   # verify_on_cloud: true
@@ -33,43 +34,48 @@ pose:
   gamma: 1.18
 
 rules:
-  phone_confirm_frames: 7
-  smoking_confirm_frames: 7
-  no_seatbelt_confirm_frames: 12
+  temporal_window_frames: 12
+  temporal_cooldown_frames: 80
+  phone_confirm_frames: 5
+  no_seatbelt_confirm_frames: 8
 
   phone_score_threshold: 0.62
-  smoking_score_threshold: 0.62
 
   phone_raw_conf_fallback: 0.72
-  smoking_raw_conf_fallback: 0.70
 
   phone_hand_near_1: 1.10
   phone_hand_near_2: 1.45
   phone_face_near_1: 1.00
   phone_face_near_2: 1.35
 
-  smoking_hand_near_1: 1.00
-  smoking_hand_near_2: 1.35
-  smoking_face_near_1: 0.95
-  smoking_face_near_2: 1.25
 
   driver_roi_bonus_phone: 0.15
-  driver_roi_bonus_smoking: 0.10
 
   phone_area_rel_min: 0.01
   phone_area_rel_max: 0.22
 
-  smoking_area_rel_min: 0.002
-  smoking_area_rel_max: 0.10
 
   seatbelt_conf_threshold: 0.45
   seatbelt_margin: 0.07
 
 classes:
   phone_names: ["phone"]
-  smoking_names: ["smoking"]
   no_seatbelt_names: ["no-seatbelt"]
   seatbelt_names: ["seatbelt"]
+
+hierarchy:
+  enabled: true
+  vehicle_stage_enabled: true
+  vehicle_names: ["car", "truck", "bus"]
+  max_vehicles: 3
+  min_vehicle_area_ratio: 0.025
+  windshield_x_margin: 0.12
+  windshield_y_start: 0.04
+  windshield_y_end: 0.58
+  vehicle_imgsz: 640
+  dms_imgsz: 768
+  chest_imgsz: 768
+  chest_second_pass_enabled: true
 
 storage:
   alerts_dir: "outputs/alerts"

@@ -1,0 +1,13 @@
+{
+  "source_kernel": "lethunga/train-dms-yolo11m-three-class-12k",
+  "source_status": "CANCEL_ACKNOWLEDGED",
+  "completed_epochs": 59,
+  "best_epoch_one_based": 51,
+  "best_fitness": 0.59828,
+  "best_pt_sha256": "06c8d92e82b556943af507fb6619383d0b973cd5cd86702a35f731d9b50399f7",
+  "classes": [
+    "phone",
+    "seatbelt",
+    "no-seatbelt"
+  ]
+}

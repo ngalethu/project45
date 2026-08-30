@@ -1,0 +1,108 @@
+{
+  "source_dataset": "D:\\.idea\\project4\\data\\processed\\dms_yolo_3class_v3_curated",
+  "output_dataset": "D:\\.idea\\project4\\data\\processed\\dms_yolo_3class_v4_12k",
+  "policy": {
+    "classes": {
+      "0": "phone",
+      "1": "seatbelt",
+      "2": "no-seatbelt"
+    },
+    "train_target": 12000,
+    "one_image_per_capture_group": true,
+    "retain_all_sources": [
+      "roboflow_seatbelt_mobile",
+      "dms_safety"
+    ],
+    "retain_all_images_containing": [
+      "no-seatbelt"
+    ],
+    "train_negative_limit": 800,
+    "selection": "required coverage plus deterministic round-robin strata",
+    "seed": 42
+  },
+  "splits": {
+    "train": {
+      "images": 12000,
+      "unique_groups": 12000,
+      "sources": {
+        "dms_safety": 1668,
+        "roboflow_seatbelt_mobile": 649,
+        "roboflow_v9_primary": 9683
+      },
+      "class_instances": {
+        "phone": 5185,
+        "seatbelt": 4528,
+        "no-seatbelt": 3692
+      },
+      "label_combinations": {
+        "negative": 800,
+        "no-seatbelt": 3157,
+        "phone": 3592,
+        "phone+no-seatbelt": 267,
+        "phone+seatbelt": 145,
+        "phone+seatbelt+no-seatbelt": 2,
+        "seatbelt": 3980,
+        "seatbelt+no-seatbelt": 57
+      },
+      "negative_images": 800
+    },
+    "val": {
+      "images": 2801,
+      "unique_groups": 1947,
+      "sources": {
+        "dms_safety": 421,
+        "roboflow_seatbelt_mobile": 82,
+        "roboflow_v9_primary": 2298
+      },
+      "class_instances": {
+        "phone": 1384,
+        "seatbelt": 939,
+        "no-seatbelt": 570
+      },
+      "label_combinations": {
+        "negative": 423,
+        "no-seatbelt": 476,
+        "phone": 996,
+        "phone+no-seatbelt": 35,
+        "phone+seatbelt": 14,
+        "seatbelt": 846,
+        "seatbelt+no-seatbelt": 11
+      },
+      "negative_images": 423
+    },
+    "test": {
+      "images": 2681,
+      "unique_groups": 1893,
+      "sources": {
+        "dms_safety": 364,
+        "roboflow_seatbelt_mobile": 69,
+        "roboflow_v9_primary": 2248
+      },
+      "class_instances": {
+        "phone": 1435,
+        "seatbelt": 853,
+        "no-seatbelt": 492
+      },
+      "label_combinations": {
+        "negative": 435,
+        "no-seatbelt": 408,
+        "phone": 985,
+        "phone+no-seatbelt": 41,
+        "phone+seatbelt": 17,
+        "seatbelt": 786,
+        "seatbelt+no-seatbelt": 9
+      },
+      "negative_images": 435
+    }
+  },
+  "group_leakage": {
+    "groups_crossing_splits": 0,
+    "samples": []
+  },
+  "driver_leakage": "not_verifiable because source driver IDs are unavailable",
+  "roadside_external_test_images": 69,
+  "transfer": {
+    "hardlinked": 17482
+  },
+  "images_total": 17482
+}

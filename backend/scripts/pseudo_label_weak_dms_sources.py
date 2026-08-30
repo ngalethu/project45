@@ -26,9 +26,9 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = BACKEND_DIR.parent
 DEFAULT_AUC_ZIP = PROJECT_ROOT / "data" / "sources" / "_archives" / "auc.distracted.driver.dataset_v2.zip"
 DEFAULT_SEATBELT_ZIP = Path.home() / "Downloads" / "archive (1).zip"
-DEFAULT_BASE_YAML = PROJECT_ROOT / "data" / "processed" / "dms_yolo_4class_v2" / "dms_dataset.yaml"
+DEFAULT_BASE_YAML = PROJECT_ROOT / "data" / "processed" / "dms_yolo_3class_v3_curated" / "dms_dataset.yaml"
 DEFAULT_OUTPUT = PROJECT_ROOT / "data" / "processed" / "dms_weak_pseudolabels_v1"
-CANONICAL_NAMES = ["phone", "seatbelt", "no-seatbelt", "smoking"]
+CANONICAL_NAMES = ["phone", "seatbelt", "no-seatbelt"]
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 AUC_PHONE_CLASSES = {"c1", "c2", "c3", "c4"}
 
@@ -41,8 +41,6 @@ def canon_name(value: str) -> str:
         "cell-phone": "phone",
         "seat-belt": "seatbelt",
         "no seatbelt": "no-seatbelt",
-        "cigarette": "smoking",
-        "smoke": "smoking",
     }
     return aliases.get(value, value)
 
@@ -197,7 +195,7 @@ def create_combined_yaml(base_yaml: Path, pseudo_dir: Path) -> Path:
         ],
         "val": (base_root / data["val"]).resolve().as_posix(),
         "test": (base_root / data["test"]).resolve().as_posix(),
-        "nc": 4,
+        "nc": len(CANONICAL_NAMES),
         "names": dict(enumerate(CANONICAL_NAMES)),
     }
     output = pseudo_dir / "dms_dataset_with_pseudo.yaml"

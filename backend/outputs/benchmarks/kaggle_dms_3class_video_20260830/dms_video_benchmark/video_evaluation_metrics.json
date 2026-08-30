@@ -1,0 +1,258 @@
+{
+  "schema_version": 2,
+  "evaluation_unit": "one video contributes one decision per event",
+  "manifest": "/kaggle/working/project/data/sample_videos/benchmark_manifest.json",
+  "videos_declared": 9,
+  "videos_evaluated": 9,
+  "exact_match_accuracy": 0.4444,
+  "per_event": {
+    "using_phone": {
+      "tp": 3,
+      "fp": 2,
+      "fn": 1,
+      "tn": 3,
+      "precision": 0.6,
+      "recall": 0.75,
+      "f1": 0.6667
+    },
+    "no_seatbelt": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 1,
+      "tn": 7,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "normal": {
+      "tp": 2,
+      "fp": 2,
+      "fn": 2,
+      "tn": 3,
+      "precision": 0.5,
+      "recall": 0.5,
+      "f1": 0.5
+    }
+  },
+  "violation_micro": {
+    "tp": 3,
+    "fp": 3,
+    "fn": 2,
+    "tn": 10,
+    "precision": 0.5,
+    "recall": 0.6,
+    "f1": 0.5455
+  },
+  "violation_macro_f1": 0.3333,
+  "elapsed_sec": 25.135,
+  "details": [
+    {
+      "file": "phone_driver.mp4",
+      "events": [
+        "using_phone"
+      ],
+      "camera_id": "sample_phone_01",
+      "driver_id": "unknown",
+      "status": "evaluated",
+      "expected_events": [
+        "using_phone"
+      ],
+      "predicted_events": [
+        "normal"
+      ],
+      "exact_match": false,
+      "confidence": 0.0,
+      "sampled_frames": 38,
+      "event_frame_votes": {
+        "using_phone": 0,
+        "no_seatbelt": 0
+      },
+      "elapsed_sec": 4.682
+    },
+    {
+      "file": "pexels_driver_phone.mp4",
+      "events": [
+        "using_phone"
+      ],
+      "camera_id": "pexels_phone_01",
+      "driver_id": "unknown",
+      "status": "evaluated",
+      "expected_events": [
+        "using_phone"
+      ],
+      "predicted_events": [
+        "using_phone"
+      ],
+      "exact_match": true,
+      "confidence": 0.857,
+      "sampled_frames": 38,
+      "event_frame_votes": {
+        "using_phone": 36,
+        "no_seatbelt": 0
+      },
+      "elapsed_sec": 3.773
+    },
+    {
+      "file": "pexels_driver_distracted_phone_1.mp4",
+      "events": [
+        "using_phone"
+      ],
+      "camera_id": "pexels_phone_02",
+      "driver_id": "unknown",
+      "status": "evaluated",
+      "expected_events": [
+        "using_phone"
+      ],
+      "predicted_events": [
+        "no_seatbelt",
+        "using_phone"
+      ],
+      "exact_match": false,
+      "confidence": 0.708,
+      "sampled_frames": 38,
+      "event_frame_votes": {
+        "using_phone": 17,
+        "no_seatbelt": 27
+      },
+      "elapsed_sec": 3.655
+    },
+    {
+      "file": "real_driver_phone.mp4",
+      "events": [
+        "using_phone"
+      ],
+      "camera_id": "real_phone_01",
+      "driver_id": "unknown",
+      "status": "evaluated",
+      "expected_events": [
+        "using_phone"
+      ],
+      "predicted_events": [
+        "using_phone"
+      ],
+      "exact_match": true,
+      "confidence": 0.902,
+      "sampled_frames": 38,
+      "event_frame_votes": {
+        "using_phone": 9,
+        "no_seatbelt": 4
+      },
+      "elapsed_sec": 3.181
+    },
+    {
+      "file": "no_seatbelt_driver.mp4",
+      "events": [
+        "no_seatbelt"
+      ],
+      "camera_id": "sample_seatbelt_01",
+      "driver_id": "unknown",
+      "status": "evaluated",
+      "expected_events": [
+        "no_seatbelt"
+      ],
+      "predicted_events": [
+        "normal"
+      ],
+      "exact_match": false,
+      "confidence": 0.0,
+      "sampled_frames": 38,
+      "event_frame_votes": {
+        "using_phone": 0,
+        "no_seatbelt": 0
+      },
+      "elapsed_sec": 2.231
+    },
+    {
+      "file": "normal_driving.mp4",
+      "events": [
+        "normal"
+      ],
+      "camera_id": "sample_normal_01",
+      "driver_id": "unknown",
+      "status": "evaluated",
+      "expected_events": [
+        "normal"
+      ],
+      "predicted_events": [
+        "normal"
+      ],
+      "exact_match": true,
+      "confidence": 0.0,
+      "sampled_frames": 38,
+      "event_frame_votes": {
+        "using_phone": 0,
+        "no_seatbelt": 0
+      },
+      "elapsed_sec": 2.221
+    },
+    {
+      "file": "pexels_night_driving_car_inside_1.mp4",
+      "events": [
+        "normal"
+      ],
+      "camera_id": "pexels_night_01",
+      "driver_id": "unknown",
+      "status": "evaluated",
+      "expected_events": [
+        "normal"
+      ],
+      "predicted_events": [
+        "using_phone"
+      ],
+      "exact_match": false,
+      "confidence": 0.916,
+      "sampled_frames": 38,
+      "event_frame_votes": {
+        "using_phone": 38,
+        "no_seatbelt": 0
+      },
+      "elapsed_sec": 1.993
+    },
+    {
+      "file": "pexels_driver_drowsy.mp4",
+      "events": [
+        "normal"
+      ],
+      "camera_id": "pexels_normal_01",
+      "driver_id": "unknown",
+      "status": "evaluated",
+      "expected_events": [
+        "normal"
+      ],
+      "predicted_events": [
+        "normal"
+      ],
+      "exact_match": true,
+      "confidence": 0.0,
+      "sampled_frames": 38,
+      "event_frame_votes": {
+        "using_phone": 0,
+        "no_seatbelt": 0
+      },
+      "elapsed_sec": 2.431
+    },
+    {
+      "file": "test.mp4",
+      "events": [
+        "normal"
+      ],
+      "camera_id": "sample_test_01",
+      "driver_id": "unknown",
+      "status": "evaluated",
+      "expected_events": [
+        "normal"
+      ],
+      "predicted_events": [
+        "using_phone"
+      ],
+      "exact_match": false,
+      "confidence": 0.45,
+      "sampled_frames": 15,
+      "event_frame_votes": {
+        "using_phone": 6,
+        "no_seatbelt": 0
+      },
+      "elapsed_sec": 0.967
+    }
+  ]
+}

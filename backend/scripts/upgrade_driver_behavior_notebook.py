@@ -48,16 +48,14 @@ def main() -> None:
             r"""
 # Driver Behavior Detection — YOLO11m + MediaPipe (Kaggle/Colab)
 
-Notebook phát triển từ bản `minimal_stable`, giữ nguyên engine YOLO + MediaPipe và nâng cấp phần dữ liệu/huấn luyện cho **4 lớp canonical**:
+Notebook phát triển từ bản `minimal_stable`, giữ nguyên engine YOLO + MediaPipe và nâng cấp phần dữ liệu/huấn luyện cho **3 lớp canonical**:
 
 1. `phone`
 2. `seatbelt`
 3. `no-seatbelt`
-4. `smoking`
-
 ## Pipeline mới
 
-- Detection có bounding box: Roboflow Primary v9 + Roboflow Seatbelt/Mobile + DMS Safety.
+- Detection có bounding box: Roboflow Primary v9 + Roboflow Seatbelt/Mobile + DMS Safety; loại toàn bộ ảnh có nhãn smoking.
 - Weak source: Seatbelt Real và AUC Distracted Driver (chỉ khi có quyền truy cập/password hợp lệ) được dùng qua pseudo-label có ngưỡng cao.
 - Chia lại theo nhóm ảnh/video để tránh leakage giữa train/val/test.
 - Train base → đánh giá test → pseudo-label → fine-tune → tự chọn checkpoint tốt hơn.
@@ -225,7 +223,7 @@ if PLATFORM == "local":
 
 Trên Kaggle, hãy attach dataset bundle chứa:
 
-- `dms_yolo_4class_v2.zip`: 38.969 ảnh detection hợp lệ đã harmonize.
+- `dms_yolo_3class_v3_curated.zip`: 26.773 ảnh detection đã curate, gồm 21.291 train và không có smoking.
 - `seatbelt_real_unlabelled.zip`: 8 hard-case chưa có bounding box.
 - `training_code.zip`: script audit/train/pseudo-label.
 - `yolo11m.pt`: pretrained checkpoint để chạy được cả khi notebook tắt Internet.
@@ -237,13 +235,13 @@ AUC không được đóng gói lại vì license cấm phân phối; attach ri�
         code(
             r"""
 # 3) CẤU HÌNH CHÍNH
-DATASET_ARCHIVE_NAME = "dms_yolo_4class_v2.zip"
+DATASET_ARCHIVE_NAME = "dms_yolo_3class_v3_curated.zip"
 AUC_ARCHIVE_NAME = "auc.distracted.driver.dataset_v2.zip"
 SEATBELT_ARCHIVE_NAME = "seatbelt_real_unlabelled.zip"
 TRAINING_CODE_ARCHIVE_NAME = "training_code.zip"
 
-EXP_NAME = "yolo11m_dms_4class_base"
-FINE_TUNE_NAME = "yolo11m_dms_4class_pseudo_finetune"
+EXP_NAME = "yolo11m_dms_3class_v3_base"
+FINE_TUNE_NAME = "yolo11m_dms_3class_v3_pseudo_finetune"
 MODEL_NAME = "yolo11m.pt"
 RESUME_CKPT = None
 FINE_RESUME_CKPT = None
@@ -889,9 +887,9 @@ def find_input_dir(dirname: str, required: bool = False):
         raise FileNotFoundError(f"Không thấy thư mục {dirname} trong {INPUT_ROOT}.")
     return None
 
-local_v2 = Path(r"D:/.idea/project4/data/processed/dms_yolo_4class_v2")
-if PLATFORM == "local" and (local_v2 / "dms_dataset.yaml").exists():
-    dataset_dir_used = local_v2
+local_v3 = Path(r"D:/.idea/project4/data/processed/dms_yolo_3class_v3_curated")
+if PLATFORM == "local" and (local_v3 / "dms_dataset.yaml").exists():
+    dataset_dir_used = local_v3
 else:
     # Kaggle Upload Data thường tự giải nén ZIP thành một hoặc nhiều thư mục lồng nhau.
     # Ưu tiên YAML đã attach; chỉ giải nén thủ công khi Input thực sự còn file ZIP.
@@ -949,9 +947,9 @@ if isinstance(names_raw, dict):
 else:
     names = list(names_raw or [])
 
-EXPECTED_NAMES = ["phone", "seatbelt", "no-seatbelt", "smoking"]
+EXPECTED_NAMES = ["phone", "seatbelt", "no-seatbelt"]
 assert names == EXPECTED_NAMES, f"Sai ontology/order: {names} != {EXPECTED_NAMES}"
-assert int(cfg.get("nc", 0)) == 4, f"nc phải bằng 4, hiện tại: {cfg.get('nc')}"
+assert int(cfg.get("nc", 0)) == 3, f"nc phải bằng 3, hiện tại: {cfg.get('nc')}"
 
 dataset_root = Path(cfg.get("path") or ".")
 if not dataset_root.is_absolute():
@@ -972,9 +970,9 @@ print(yaml_path.read_text(encoding="utf-8"))
 
 | Source | Mapping sang canonical | Nhãn loại bỏ |
 |---|---|---|
-| Roboflow Primary v9 | `0→no-seatbelt`, `1→phone`, `2→seatbelt`, `3→smoking` | — |
+| Roboflow Primary v9 | `0→no-seatbelt`, `1→phone`, `2→seatbelt` | `smoking` và ảnh chứa smoking |
 | Seatbelt & Mobile | `mobile→phone`, `seatbelt→seatbelt` | `windshield` |
-| DMS Safety | `cigarette→smoking`, `phone→phone`, `seatbelt→seatbelt` | `open-eye`, `closed-eye` |
+| DMS Safety | `phone→phone`, `seatbelt→seatbelt` | `cigarette/smoking`, `open-eye`, `closed-eye` |
 | AUC / Seatbelt Real | teacher pseudo-label, `conf ≥ 0.72` | ảnh không có box tin cậy |
 
 Không sửa riêng tên trong YAML nếu chưa remap class id trong từng label.
@@ -1378,7 +1376,7 @@ print("MODEL_FOR_INFER:", MODEL_FOR_INFER)
     )
 
     notebook["cells"] = front + weak_stage + inference_tail
-    notebook.setdefault("metadata", {})["dms_pipeline_version"] = "4class-multisource-rtx5090-5h-v9"
+    notebook.setdefault("metadata", {})["dms_pipeline_version"] = "3class-v3-curated-rtx5090-5h-v10"
     notebook["metadata"]["accelerator"] = "GPU"
     NOTEBOOK.write_text(json.dumps(notebook, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"Updated {NOTEBOOK} with {len(notebook['cells'])} cells")

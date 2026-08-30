@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 
-from app.common.constants import EVENT_NO_SEATBELT, EVENT_SMOKING, EVENT_USING_PHONE
+from app.common.constants import EVENT_NO_SEATBELT, EVENT_USING_PHONE
 from app.common.types import BBox, CandidateEvent, Detection, PoseResult
 from app.common.utils import bbox_center, euclidean
 
@@ -19,8 +19,6 @@ def canon_name(x: str) -> str:
         "cell-phone": "phone",
         "mobile-phone": "phone",
         "mobile phone": "phone",
-        "smoke": "smoking",
-        "cigarette": "smoking",
     }
     return alias.get(x, x)
 
@@ -110,14 +108,17 @@ def build_chest_roi(pose: PoseResult, w: int, h: int) -> Optional[Tuple[float, f
 
     if lh is not None and rh is not None:
         hip_mid = midpoint(lh, rh)
-        chest_h = abs(hip_mid[1] - shoulder_mid[1]) * 0.65
+        chest_h = max(
+            abs(hip_mid[1] - shoulder_mid[1]) * 1.05,
+            shoulder_width * 0.95,
+        )
     else:
-        chest_h = shoulder_width * 0.95
+        chest_h = shoulder_width * 1.15
 
-    x1 = shoulder_mid[0] - shoulder_width * 0.70
-    x2 = shoulder_mid[0] + shoulder_width * 0.70
-    y1 = shoulder_mid[1] - shoulder_width * 0.18
-    y2 = y1 + chest_h
+    x1 = shoulder_mid[0] - shoulder_width * 0.85
+    x2 = shoulder_mid[0] + shoulder_width * 0.85
+    y1 = shoulder_mid[1] - shoulder_width * 0.25
+    y2 = shoulder_mid[1] + chest_h
 
     x1 = max(0.0, x1)
     y1 = max(0.0, y1)
@@ -132,7 +133,6 @@ class BehaviorRules:
         self.cfg = config
 
         self.phone_names = {canon_name(n) for n in config["classes"]["phone_names"]}
-        self.smoking_names = {canon_name(n) for n in config["classes"]["smoking_names"]}
         self.no_seatbelt_names = {canon_name(n) for n in config["classes"]["no_seatbelt_names"]}
         self.seatbelt_names = {canon_name(n) for n in config["classes"]["seatbelt_names"]}
 
@@ -146,10 +146,6 @@ class BehaviorRules:
         phone_event = self._infer_phone(detections, pose, driver_roi)
         if phone_event:
             events.append(phone_event)
-
-        smoking_event = self._infer_smoking(detections, pose, driver_roi)
-        if smoking_event:
-            events.append(smoking_event)
 
         seatbelt_event = self._infer_no_seatbelt(detections, chest_roi)
         if seatbelt_event:
@@ -201,50 +197,6 @@ class BehaviorRules:
             score += 0.08
         else:
             score -= 0.12
-
-        return float(min(max(score, 0.0), 1.0))
-
-    def _score_smoking_behavior(
-        self,
-        smoke_det: Detection,
-        pose: PoseResult,
-        driver_roi: Optional[Tuple[float, float, float, float]],
-    ) -> float:
-        score = smoke_det.confidence
-        shoulder_width = get_shoulder_width(pose)
-        center = bbox_center(smoke_det.bbox)
-
-        nose = get_pt(pose, "nose")
-        mouth_l = get_pt(pose, "mouth_left")
-        mouth_r = get_pt(pose, "mouth_right")
-        l_wrist = get_pt(pose, "left_wrist")
-        r_wrist = get_pt(pose, "right_wrist")
-
-        face_pts = [p for p in [nose, mouth_l, mouth_r] if p is not None]
-        hand_pts = [p for p in [l_wrist, r_wrist] if p is not None]
-
-        if face_pts:
-            d_face = min(euclidean(center, p) for p in face_pts) / shoulder_width
-            if d_face < self.cfg["rules"]["smoking_face_near_1"]:
-                score += 0.25
-            elif d_face < self.cfg["rules"]["smoking_face_near_2"]:
-                score += 0.10
-
-        if hand_pts:
-            d_hand = min(euclidean(center, p) for p in hand_pts) / shoulder_width
-            if d_hand < self.cfg["rules"]["smoking_hand_near_1"]:
-                score += 0.18
-            elif d_hand < self.cfg["rules"]["smoking_hand_near_2"]:
-                score += 0.08
-
-        if driver_roi is not None and point_in_box(center, driver_roi):
-            score += self.cfg["rules"]["driver_roi_bonus_smoking"]
-
-        rel_area = box_area(smoke_det.bbox) / max(1.0, shoulder_width * shoulder_width)
-        if self.cfg["rules"]["smoking_area_rel_min"] <= rel_area <= self.cfg["rules"]["smoking_area_rel_max"]:
-            score += 0.08
-        else:
-            score -= 0.10
 
         return float(min(max(score, 0.0), 1.0))
 
@@ -303,41 +255,6 @@ class BehaviorRules:
                 bbox=best_det.bbox,
                 raw_confidence=best_det.confidence,
                 note="phone detected with strict pose rules",
-            )
-        return None
-
-    def _infer_smoking(
-        self,
-        detections: List[Detection],
-        pose: PoseResult,
-        driver_roi: Optional[Tuple[float, float, float, float]],
-    ) -> Optional[CandidateEvent]:
-        smoke_dets = self._filter_by_names(detections, self.smoking_names)
-        if not smoke_dets:
-            return None
-
-        if not pose.points:
-            best = max(smoke_dets, key=lambda d: d.confidence)
-            if best.confidence >= self.cfg["rules"]["smoking_raw_conf_fallback"]:
-                return CandidateEvent(
-                    event_type=EVENT_SMOKING,
-                    score=float(best.confidence),
-                    bbox=best.bbox,
-                    raw_confidence=best.confidence,
-                    note="fallback no pose",
-                )
-            return None
-
-        scored = [(self._score_smoking_behavior(det, pose, driver_roi), det) for det in smoke_dets]
-        best_score, best_det = max(scored, key=lambda x: x[0])
-
-        if best_score >= self.cfg["rules"]["smoking_score_threshold"]:
-            return CandidateEvent(
-                event_type=EVENT_SMOKING,
-                score=float(best_score),
-                bbox=best_det.bbox,
-                raw_confidence=best_det.confidence,
-                note="smoking score with pose",
             )
         return None
 

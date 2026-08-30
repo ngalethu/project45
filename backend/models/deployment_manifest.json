@@ -1,0 +1,18 @@
+{
+  "installed_at": "2026-08-30T01:39:43.945890+00:00",
+  "classes": [
+    "phone",
+    "seatbelt",
+    "no-seatbelt"
+  ],
+  "source_best_pt": "D:\\.idea\\project4\\backend\\outputs\\kaggle_dms_3class_v4_12k_finalized_20260830\\dms_export\\best.pt",
+  "source_best_onnx": "D:\\.idea\\project4\\backend\\outputs\\kaggle_dms_3class_v4_12k_finalized_20260830\\dms_export\\best.onnx",
+  "source_metrics": "D:\\.idea\\project4\\backend\\outputs\\kaggle_dms_3class_v4_12k_finalized_20260830\\dms_export\\metrics_summary.json",
+  "backup_dir": "D:\\.idea\\project4\\backend\\models\\backups\\20260830T013942Z",
+  "metrics": {
+    "map50": 0.9295038353908808,
+    "map50_95": 0.6334839080323638,
+    "f1_macro": 0.8969739086749207,
+    "target_met": true
+  }
+}

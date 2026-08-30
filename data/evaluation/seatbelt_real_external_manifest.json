@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "source": "seatbelt_real_car_photos",
+  "license": "CC BY 4.0",
+  "training_use": false,
+  "limitations": "Eight images of one driver; weak image-level seatbelt labels only.",
+  "samples": [
+    {"image": "data/raw/test/images/real_car_IMG_8988_640x640.jpeg", "expected_labels": ["seatbelt"], "camera_id": "real_car_front_01", "driver_id": "subject_01"},
+    {"image": "data/raw/train/images/real_car_IMG_9380_resized_640x640.jpeg", "expected_labels": ["seatbelt"], "camera_id": "real_car_front_02", "driver_id": "subject_01"},
+    {"image": "data/raw/train/images/real_car_IMG_9388_resized_640x640.jpeg", "expected_labels": ["seatbelt"], "camera_id": "real_car_front_03", "driver_id": "subject_01"},
+    {"image": "data/raw/train/images/real_car_IMG_9397_resized_640x640.jpeg", "expected_labels": ["seatbelt"], "camera_id": "real_car_front_04", "driver_id": "subject_01"},
+    {"image": "data/raw/train/images/real_car_IMG_9410_resized_640x640.jpeg", "expected_labels": ["seatbelt"], "camera_id": "real_car_front_05", "driver_id": "subject_01"},
+    {"image": "data/raw/train/images/real_car_IMG_9418_resized_640x640.jpeg", "expected_labels": ["seatbelt"], "camera_id": "real_car_front_06", "driver_id": "subject_01"},
+    {"image": "data/raw/train/images/real_car_IMG_9428_resized_640x640.jpeg", "expected_labels": ["seatbelt"], "camera_id": "real_car_front_07", "driver_id": "subject_01"},
+    {"image": "data/raw/val/images/real_car_alex_training_ia_640x640.jpg", "expected_labels": ["seatbelt"], "camera_id": "real_car_front_08", "driver_id": "subject_01"}
+  ]
+}
